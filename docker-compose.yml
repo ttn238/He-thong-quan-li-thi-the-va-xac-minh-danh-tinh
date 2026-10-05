@@ -1,0 +1,51 @@
+services:
+  # Database Service (SQL Server)
+  database:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: death_management_db
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=YourStrongPassword123!
+    ports:
+      - "1433:1433"
+    volumes:
+      - db_data:/var/opt/mssql/data
+
+  # Backend .NET API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: src/DeathManagement.API/Dockerfile
+    container_name: death_management_api
+    ports:
+      - "5000:8080"
+    depends_on:
+      - database
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=database;Database=DeathManagementDb;User Id=sa;Password=YourStrongPassword123!;TrustServerCertificate=True;
+
+  # AI Service (Python FastAPI)
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: death_management_ai
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+
+  # Frontend (React Vite)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: death_management_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
