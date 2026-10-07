@@ -108,9 +108,105 @@ CREATE TABLE NguoiDung
 );
 GO
 
-CREATE TABLE TinBao (
-    MaTinBao INT
+
+CREATE TABLE LoaiTinBao
+(
+    MaLoaiTinBao INT IDENTITY(1,1) PRIMARY KEY,
+    TenLoaiTinBao NVARCHAR(100) NOT NULL UNIQUE,
+    MoTa NVARCHAR(255) NULL,
+    TrangThai BIT NOT NULL DEFAULT 1
 );
+GO
+
+CREATE TABLE TinBao (
+     MaTinBao INT IDENTITY(1,1) PRIMARY KEY,
+
+    -- Ma hien thi, vi du TB000001
+    MaTin AS ('TB' + RIGHT('000000' + CAST(MaTinBao AS VARCHAR(10)), 6)) PERSISTED,
+
+    MaLoaiTinBao INT NOT NULL,
+
+    TieuDe NVARCHAR(200) NOT NULL,
+    NoiDung NVARCHAR(MAX) NOT NULL,
+
+    ThoiGianXayRa DATETIME2 NOT NULL,
+    DiaDiem NVARCHAR(500) NOT NULL,
+
+    NguonTin NVARCHAR(20) NOT NULL DEFAULT N'NguoiDan',
+
+    -- Thong tin nguoi bao tin (nguoi dan co the khong co tai khoan)
+    HoTenNguoiBao NVARCHAR(150) NULL,
+    SoDienThoaiNguoiBao VARCHAR(20) NULL,
+    EmailNguoiBao VARCHAR(100) NULL,
+
+    MaNguoiTiepNhan INT NULL,
+    MaDonVi INT NULL,
+
+    MucDoUuTien NVARCHAR(20) NOT NULL DEFAULT N'BinhThuong',
+    TrangThai NVARCHAR(30) NOT NULL DEFAULT N'MoiTiepNhan',
+    GhiChuXuLy NVARCHAR(1000) NULL,
+
+    NgayTiepNhan DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    NgayCapNhat DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+
+    CONSTRAINT FK_TinBao_LoaiTinBao
+        FOREIGN KEY (MaLoaiTinBao)
+        REFERENCES LoaiTinBao(MaLoaiTinBao),
+
+    CONSTRAINT FK_TinBao_NguoiTiepNhan
+        FOREIGN KEY (MaNguoiTiepNhan)
+        REFERENCES NguoiDung(MaNguoiDung),
+
+    CONSTRAINT FK_TinBao_DonVi
+        FOREIGN KEY (MaDonVi)
+        REFERENCES DonVi(MaDonVi),
+
+    CONSTRAINT CK_TinBao_NguonTin
+        CHECK (NguonTin IN (N'NguoiDan', N'CanBo')),
+
+    CONSTRAINT CK_TinBao_MucDoUuTien
+        CHECK (MucDoUuTien IN (N'Thap', N'BinhThuong', N'Cao', N'KhanCap')),
+
+    CONSTRAINT CK_TinBao_TrangThai
+        CHECK (TrangThai IN (N'MoiTiepNhan', N'DangXuLy', N'DaChuyenXuLy', N'DaHoanThanh', N'DaHuy'))
+);
+GO
+
+CREATE INDEX IX_TinBao_TrangThai ON TinBao(TrangThai);
+CREATE INDEX IX_TinBao_ThoiGianXayRa ON TinBao(ThoiGianXayRa);
+CREATE INDEX IX_TinBao_LoaiTinBao ON TinBao(MaLoaiTinBao);
+GO
+
+CREATE TABLE TepTinBao
+(
+    MaTep INT IDENTITY(1,1) PRIMARY KEY,
+    MaTinBao INT NOT NULL,
+
+    TenTep NVARCHAR(255) NOT NULL,
+    DuongDan NVARCHAR(500) NOT NULL,
+    LoaiTep NVARCHAR(20) NOT NULL,
+    KichThuoc BIGINT NULL,
+
+    MaNguoiTaiLen INT NULL,
+    ThoiGianTaiLen DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+
+    CONSTRAINT FK_TepTinBao_TinBao
+        FOREIGN KEY (MaTinBao)
+        REFERENCES TinBao(MaTinBao)
+        ON DELETE CASCADE,
+
+    CONSTRAINT FK_TepTinBao_NguoiDung
+        FOREIGN KEY (MaNguoiTaiLen)
+        REFERENCES NguoiDung(MaNguoiDung),
+
+    CONSTRAINT CK_TepTinBao_LoaiTep
+        CHECK (LoaiTep IN (N'Anh', N'Video', N'TaiLieu'))
+);
+GO
+
+CREATE INDEX IX_TepTinBao_TinBao ON TepTinBao(MaTinBao);
+GO
+
 
 CREATE TABLE HoSoThiThe (
     MaThiThe INT
