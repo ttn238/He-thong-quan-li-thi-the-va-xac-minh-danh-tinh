@@ -228,9 +228,56 @@ CREATE TABLE NganLuuTru (
     MaNgan INT
 );
 
-CREATE TABLE HoSoNguoiMatTich (
-    MaNguoiMatTich INT
+CREATE TABLE HoSoNguoiMatTich
+(
+    MaNguoiMatTich INT IDENTITY(1,1) PRIMARY KEY,
+
+    -- Thông tin cá nhân
+    HoTen NVARCHAR(150) NOT NULL,
+
+    NgaySinh DATE NULL,
+    TuoiUocTinh INT NULL,                          -- tuổi ước lượng (khi không rõ ngày sinh), khớp bảng thi thể
+    GioiTinh NVARCHAR(10) NOT NULL,
+    CCCD VARCHAR(20) NULL,                         -- UC02 có CCCD cho người thân; để NULL vì trẻ em/không giấy tờ
+
+    -- Đặc điểm nhận dạng
+    ChieuCao DECIMAL(5,1) NULL,                    -- cm
+    DacDiemCoThe NVARCHAR(1000) NULL,              -- sẹo, nốt ruồi, hình xăm, răng...
+    DacDiemKhuonMat NVARCHAR(500) NULL,
+
+    -- Thông tin mất tích
+    ThoiGianMatTich DATETIME2 NOT NULL,
+    NoiMatTich NVARCHAR(500) NOT NULL,
+
+    -- Quản lý hồ sơ
+    TrangThai NVARCHAR(30) NOT NULL DEFAULT N'Đã gửi',      -- vòng đời theo docx (UC07, mục 11)
+    NgayTao DATETIME2 NOT NULL DEFAULT SYSDATETIME(),       -- [ĐỀ XUẤT]
+    NgayCapNhat DATETIME2 NULL,                             -- [ĐỀ XUẤT]
+
+    CONSTRAINT CK_HoSoNguoiMatTich_GioiTinh
+        CHECK (GioiTinh IN (N'Nam', N'Nữ', N'Khác')),   -- [ĐỀ XUẤT]
+
+    -- Trạng thái lấy từ docx: UC07/mục 11 (vòng đời) + UC04 ("Đang xử lý")
+    CONSTRAINT CK_HoSoNguoiMatTich_TrangThai
+        CHECK (TrangThai IN (
+            N'Đã gửi',            -- người dùng/cán bộ vừa đăng ký hồ sơ
+            N'Đang xử lý',        -- UC04: AI đang đối chiếu / chưa có kết quả, sẽ đối chiếu lại sau
+            N'Đang xác minh',     -- cán bộ bắt đầu xác minh
+            N'Yêu cầu bổ sung',   -- cần người dùng bổ sung thông tin
+            N'Đã xác nhận',       -- cán bộ kết luận xác nhận
+            N'Từ chối',           -- cán bộ từ chối (kèm lý do ở bảng kết luận)
+            N'Hoàn tất'           -- kết thúc xử lý
+        )),
+
+    CONSTRAINT FK_HoSoNguoiMatTich_NguoiDung
+        FOREIGN KEY (MaNguoiTao)
+        REFERENCES NguoiDung(MaNguoiDung),
+
+    CONSTRAINT FK_HoSoNguoiMatTich_DonVi
+        FOREIGN KEY (MaDonVi)
+        REFERENCES DonVi(MaDonVi)
 );
+GO
 
 CREATE TABLE HinhAnhNguoiMatTich (
     MaHinhAnh INT
