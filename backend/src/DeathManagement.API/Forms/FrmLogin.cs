@@ -3,8 +3,6 @@ using DeathManagement.API.Services;
 using DeathManagement.API.Services.Interfaces;
 
 namespace DeathManagement.API.Forms;
-
-// Thay cho frontend/src/pages/auth/Login.tsx (+ index.css)
 public class FrmLogin : Form
 {
     // ===== Màu & dữ liệu lấy từ index.css / Login.tsx =====
