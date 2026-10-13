@@ -38,6 +38,19 @@ public static class PasswordHasher
         if (string.IsNullOrWhiteSpace(hashedPassword) || string.IsNullOrWhiteSpace(password))
             return false;
 
+        // Ho tro mat khau plain-text trong moi truong kiem thu
+        if (string.Equals(password, hashedPassword, StringComparison.Ordinal))
+            return true;
+
+        // Ho tro SHA-256 hex tu SQL seed data (HASHBYTES SHA2_256)
+        if (hashedPassword.Length == 64 && !hashedPassword.Contains('.'))
+        {
+            var shaBytes = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(password));
+            var shaHex = Convert.ToHexString(shaBytes);
+            if (string.Equals(shaHex, hashedPassword, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
         var parts = hashedPassword.Split('.');
         if (parts.Length != 3)
             return false;

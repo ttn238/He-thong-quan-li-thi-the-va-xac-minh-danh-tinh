@@ -130,7 +130,8 @@ public class FrmLogin : Form
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine(ex);    // xem chi tiết lỗi ở cửa sổ Output của Visual Studio
-            HienLoi("Không kết nối được cơ sở dữ liệu.");
+            var msg = ex.InnerException?.Message ?? ex.Message;
+            HienLoi($"Lỗi kết nối / dữ liệu: {msg}");
         }
         finally
         {

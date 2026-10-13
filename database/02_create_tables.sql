@@ -1,5 +1,8 @@
 USE QL_XACMINHTHITHE;
 GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
  
 CREATE TABLE VaiTro
 (
@@ -190,10 +193,10 @@ CREATE TABLE HoSoThiThe
     ChieuCao DECIMAL(5,2),                -- don vi: cm
     DacDiemCoThe NVARCHAR(MAX),
     KhuonMat VARBINARY(MAX),              -- vector dac trung khuon mat
-    MaTin BIGINT NULL,
+    MaTinBao INT NULL,
 
     CONSTRAINT FK_HoSoThiThe_TinBao
-        FOREIGN KEY (MaTin) REFERENCES TinBao(MaTin),
+        FOREIGN KEY (MaTinBao) REFERENCES TinBao(MaTinBao),
 
     CONSTRAINT CK_HoSoThiThe_GioiTinh
         CHECK (GioiTinh IS NULL OR GioiTinh IN (N'Nam', N'Nu', N'Khac', N'KhongXacDinh')),
@@ -508,7 +511,7 @@ CREATE INDEX IX_VaiTroQuyen_MaQuyen      ON VaiTro_Quyen(MaQuyen);
 CREATE INDEX IX_TinBao_MaLoaiTinBao      ON TinBao(MaLoaiTinBao);
 CREATE INDEX IX_TinBao_TiepNhan          ON TinBao(MaTaiKhoanTiepNhan);
 CREATE INDEX IX_TepTinBao_TinBao ON TepTinBao(MaTinBao);
-CREATE INDEX IX_HoSoThiThe_MaTin         ON HoSoThiThe(MaTin);
+CREATE INDEX IX_HoSoThiThe_MaTinBao      ON HoSoThiThe(MaTinBao);
 CREATE INDEX IX_NguoiThan_HoSoMatTich    ON NguoiThan(MaHoSoMatTich);
 CREATE INDEX IX_TepTin_HoSoThiThe        ON TepTin(MaHoSoThiThe);
 CREATE INDEX IX_TepTin_HoSoMatTich       ON TepTin(MaHoSoMatTich);

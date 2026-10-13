@@ -51,35 +51,27 @@ public class FrmDashboard : Form
         };
         pnlTopNav.Controls.AddRange(new Control[] { pnlLogo, lblBrand, lblSub });
 
-        // Thông tin người đăng nhập bên phải
-        var pnlUserRight = new Panel { Dock = DockStyle.Right, Width = 380, BackColor = Color.Transparent };
-        var tk = Session.TaiKhoan;
-        var lblUser = new Label
+        // Thông tin người đăng nhập bên phải (FlowLayoutPanel căn phải, có lề an toàn 20px, không bao giờ bị cắt chữ)
+        var pnlUserRight = new FlowLayoutPanel
         {
-            Text = $"👤 {tk?.HoTen} [{tk?.TenVaiTro}]",
-            Font = UITheme.FontBold(9),
-            ForeColor = Color.White,
+            Dock = DockStyle.Right,
+            FlowDirection = FlowDirection.RightToLeft,
+            WrapContents = false,
             AutoSize = true,
-            Location = new Point(10, 14)
-        };
-        var lblDonVi = new Label
-        {
-            Text = $"📍 {Session.DonVi}",
-            Font = UITheme.FontRegular(8),
-            ForeColor = UITheme.Line,
-            AutoSize = true,
-            Location = new Point(10, 36)
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            BackColor = Color.Transparent,
+            Padding = new Padding(0, 14, 20, 14)
         };
 
         var btnDangXuat = new Button
         {
             Text = "ĐĂNG XUẤT",
-            Size = new Size(95, 32),
-            Location = new Point(270, 16),
+            Size = new Size(110, 36),
+            Margin = new Padding(16, 0, 0, 0),
             FlatStyle = FlatStyle.Flat,
             BackColor = ColorTranslator.FromHtml("#c0392b"),
             ForeColor = Color.White,
-            Font = UITheme.FontBold(8),
+            Font = UITheme.FontBold(8.5f),
             Cursor = Cursors.Hand
         };
         btnDangXuat.FlatAppearance.BorderSize = 0;
@@ -90,7 +82,34 @@ public class FrmDashboard : Form
             Close();
         };
 
-        pnlUserRight.Controls.AddRange(new Control[] { lblUser, lblDonVi, btnDangXuat });
+        var tk = Session.TaiKhoan;
+        var pnlUserInfo = new Panel
+        {
+            AutoSize = true,
+            BackColor = Color.Transparent,
+            Margin = new Padding(0, 1, 0, 0)
+        };
+
+        var lblUser = new Label
+        {
+            Text = $"👤 {tk?.HoTen} [{tk?.TenVaiTro}]",
+            Font = UITheme.FontBold(9.5f),
+            ForeColor = Color.White,
+            AutoSize = true,
+            Location = new Point(0, 0)
+        };
+        var lblDonVi = new Label
+        {
+            Text = $"📍 {Session.DonVi}",
+            Font = UITheme.FontRegular(8.5f),
+            ForeColor = UITheme.Line,
+            AutoSize = true,
+            Location = new Point(0, 18)
+        };
+
+        pnlUserInfo.Controls.AddRange(new Control[] { lblUser, lblDonVi });
+        pnlUserRight.Controls.Add(btnDangXuat);
+        pnlUserRight.Controls.Add(pnlUserInfo);
         pnlTopNav.Controls.Add(pnlUserRight);
 
         // 2. Menu Điều hướng (MenuStrip chuẩn WinForms MDI/Navigation)
@@ -118,7 +137,7 @@ public class FrmDashboard : Form
         mnuHeThong.DropDownItems.AddRange(new ToolStripItem[] { mnuDoiMatKhau, new ToolStripSeparator(), mnuDangXuat });
 
         var mnuQuanTri = new ToolStripMenuItem("👥 QUẢN TRỊ NGƯỜI DÙNG & VAI TRÒ");
-        var mnuUsers = new ToolStripMenuItem("Danh sách tài khoản & Phân quyền Role (3.3 / 4.5)...", null, (s, e) =>
+        var mnuUsers = new ToolStripMenuItem("Danh sách tài khoản & Phân quyền Role...", null, (s, e) =>
         {
             using var f = new FrmQuanLyNguoiDung();
             f.ShowDialog(this);
@@ -127,13 +146,23 @@ public class FrmDashboard : Form
         mnuQuanTri.DropDownItems.Add(mnuUsers);
 
         // Kiểm tra phân quyền: Chỉ ADMIN mới thấy menu Quản trị
-        var laAdmin = tk != null && (tk.TenVaiTro.Contains("Quản trị") || tk.TenVaiTro.Contains("ADMIN"));
+        var laAdmin = tk != null && (
+            tk.TenVaiTro.Contains("Quản trị", StringComparison.OrdinalIgnoreCase) ||
+            tk.TenVaiTro.Contains("ADMIN", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(tk.TenDangNhap, "admin", StringComparison.OrdinalIgnoreCase));
         mnuQuanTri.Visible = laAdmin;
 
         var mnuNghiepVu = new ToolStripMenuItem("📋 QUẢN LÝ HỒ SƠ");
         mnuNghiepVu.DropDownItems.Add(new ToolStripMenuItem("Tiếp nhận hồ sơ thi thể chưa xác định..."));
         mnuNghiepVu.DropDownItems.Add(new ToolStripMenuItem("Hồ sơ người mất tích..."));
         mnuNghiepVu.DropDownItems.Add(new ToolStripMenuItem("Đối chiếu & Xác minh danh tính..."));
+        mnuNghiepVu.DropDownItems.Add(new ToolStripSeparator());
+        var mnuKhoAnh = new ToolStripMenuItem("🖼️ Kho hình ảnh & Tệp đính kèm...", null, (s, e) =>
+        {
+            using var f = new FrmQuanLyHinhAnh();
+            f.ShowDialog(this);
+        });
+        mnuNghiepVu.DropDownItems.Add(mnuKhoAnh);
 
         var mnuTroGiup = new ToolStripMenuItem("ℹ TRỢ GIÚP");
         mnuTroGiup.DropDownItems.Add(new ToolStripMenuItem("Thông tin phần mềm DVI Vietnam"));
@@ -186,33 +215,35 @@ public class FrmDashboard : Form
 
         if (laAdmin)
         {
-            pnlButtons.Controls.Add(CreateQuickActionButton("👥 QUẢN LÝ TÀI KHOẢN & PHÂN QUYỀN",
-                "Quản lý người dùng, gán vai trò, kiểm soát trạng thái tài khoản (Mục 3.3 / 4.5)", UITheme.Navy, () =>
-                {
-                    using var f = new FrmQuanLyNguoiDung();
-                    f.ShowDialog(this);
-                    LoadThongKe();
-                }));
+            pnlButtons.Controls.Add(CreateQuickActionButton("👥 Quản lý tài khoản & Phân quyền", UITheme.Navy, () =>
+            {
+                using var f = new FrmQuanLyNguoiDung();
+                f.ShowDialog(this);
+                LoadThongKe();
+            }));
         }
 
-        pnlButtons.Controls.Add(CreateQuickActionButton("🔑 THAY ĐỔI MẬT KHẨU",
-            "Cập nhật mật khẩu bảo mật cá nhân theo thuật toán mã hóa PBKDF2", UITheme.Blue, () =>
-            {
-                using var f = new FrmDoiMatKhau();
-                f.ShowDialog(this);
-            }));
+        pnlButtons.Controls.Add(CreateQuickActionButton("🖼️ Quản lý kho hình ảnh & tệp đính kèm", ColorTranslator.FromHtml("#6c5ce7"), () =>
+        {
+            using var f = new FrmQuanLyHinhAnh();
+            f.ShowDialog(this);
+        }));
 
-        pnlButtons.Controls.Add(CreateQuickActionButton("📁 TIẾP NHẬN TỬ THI (BODY)",
-            "Lập hồ sơ thi thể tiếp nhận, ghi nhận đặc điểm nhận dạng & hiện trường", ColorTranslator.FromHtml("#34495e"), () =>
-            {
-                MessageBox.Show("Chức năng Tiếp nhận tử thi đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }));
+        pnlButtons.Controls.Add(CreateQuickActionButton("🔑 Thay đổi mật khẩu cá nhân", UITheme.Blue, () =>
+        {
+            using var f = new FrmDoiMatKhau();
+            f.ShowDialog(this);
+        }));
 
-        pnlButtons.Controls.Add(CreateQuickActionButton("🔍 ĐỐI CHIẾU DANH TÍNH (AI MATCHING)",
-            "Chạy thuật toán so khớp đa tiêu chí giữa người mất tích và thi thể", ColorTranslator.FromHtml("#27ae60"), () =>
-            {
-                MessageBox.Show("Chức năng Đối chiếu danh tính AI đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }));
+        pnlButtons.Controls.Add(CreateQuickActionButton("📁 Tiếp nhận hồ sơ tử thi (Body)", ColorTranslator.FromHtml("#34495e"), () =>
+        {
+            MessageBox.Show("Chức năng Tiếp nhận tử thi đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }));
+
+        pnlButtons.Controls.Add(CreateQuickActionButton("🔍 Đối chiếu danh tính (AI Matching)", ColorTranslator.FromHtml("#27ae60"), () =>
+        {
+            MessageBox.Show("Chức năng Đối chiếu danh tính AI đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }));
 
         pnlActionCenter.Controls.Add(lblActionTitle);
         pnlActionCenter.Controls.Add(pnlButtons);
@@ -266,46 +297,34 @@ public class FrmDashboard : Form
         return pnl;
     }
 
-    private Button CreateQuickActionButton(string title, string desc, Color btnColor, Action onClick)
+    private Button CreateQuickActionButton(string title, Color btnColor, Action onClick)
     {
         var btn = new Button
         {
-            Size = new Size(340, 110),
-            Margin = new Padding(0, 0, 20, 20),
+            Size = new Size(270, 52),
+            Margin = new Padding(0, 0, 16, 16),
             FlatStyle = FlatStyle.Flat,
             BackColor = UITheme.Soft,
             Cursor = Cursors.Hand,
-            TextAlign = ContentAlignment.TopLeft,
-            Padding = new Padding(15, 12, 15, 12)
+            Text = title,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Font = UITheme.FontBold(9f),
+            ForeColor = btnColor,
+            Padding = new Padding(12, 0, 12, 0)
         };
         btn.FlatAppearance.BorderColor = UITheme.Line;
-
-        var lblT = new Label
-        {
-            Text = title,
-            Font = UITheme.FontBold(9.5f),
-            ForeColor = btnColor,
-            AutoSize = true,
-            Location = new Point(14, 12)
-        };
-        var lblD = new Label
-        {
-            Text = desc,
-            Font = UITheme.FontRegular(8.5f),
-            ForeColor = UITheme.Muted,
-            Size = new Size(310, 50),
-            Location = new Point(14, 40)
-        };
-
-        btn.Controls.Add(lblT);
-        btn.Controls.Add(lblD);
-
-        lblT.Click += (s, e) => onClick();
-        lblD.Click += (s, e) => onClick();
         btn.Click += (s, e) => onClick();
 
-        btn.MouseEnter += (s, e) => { btn.BackColor = ColorTranslator.FromHtml("#e8f0fe"); btn.FlatAppearance.BorderColor = UITheme.Blue; };
-        btn.MouseLeave += (s, e) => { btn.BackColor = UITheme.Soft; btn.FlatAppearance.BorderColor = UITheme.Line; };
+        btn.MouseEnter += (s, e) =>
+        {
+            btn.BackColor = ColorTranslator.FromHtml("#e8f0fe");
+            btn.FlatAppearance.BorderColor = UITheme.Blue;
+        };
+        btn.MouseLeave += (s, e) =>
+        {
+            btn.BackColor = UITheme.Soft;
+            btn.FlatAppearance.BorderColor = UITheme.Line;
+        };
 
         return btn;
     }

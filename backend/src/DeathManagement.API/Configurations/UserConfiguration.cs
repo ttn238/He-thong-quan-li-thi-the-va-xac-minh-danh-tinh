@@ -10,6 +10,6 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
     {
         b.ToTable("TaiKhoanNguoiDung");
         b.HasKey(x => x.MaTaiKhoan);
-        b.HasOne(x => x.Role).WithMany().HasForeignKey(x => x.MaVaiTro);
+        b.HasOne(x => x.Role).WithMany(x => x.Users).HasForeignKey(x => x.MaVaiTro);
     }
 }

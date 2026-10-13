@@ -1,4 +1,4 @@
-USE QL_XACMINHTHITHE;
+﻿USE QL_XACMINHTHITHE;
 GO
 SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
@@ -11,7 +11,7 @@ AS
 BEGIN
     SET NOCOUNT ON;
     INSERT NhatKyHeThong (HanhDong, DoiTuongTacDong, MaTaiKhoan)
-    VALUES (@HanhDong, @DoiTuongTacDong, ISNULL(@MaTaiKhoan, fn_NguoiThaoTac()));
+    VALUES (@HanhDong, @DoiTuongTacDong, ISNULL(@MaTaiKhoan, dbo.fn_NguoiThaoTac()));
 END
 GO
 
@@ -26,15 +26,15 @@ GO
 
 -- Cong an xu ly tin bao: DaTiepNhan / TuChoi / YeuCauBoSung / DangXacMinh / DaXuLy
 CREATE OR ALTER PROCEDURE sp_XuLyTinBao
-    @MaTin BIGINT, @MaTaiKhoan BIGINT, @QuyetDinh NVARCHAR(30)
+    @MaTinBao BIGINT, @MaTaiKhoan BIGINT, @QuyetDinh NVARCHAR(30)
 AS
 BEGIN
     SET NOCOUNT ON; SET XACT_ABORT ON;
-    IF fn_CoQuyen(@MaTaiKhoan, 'INCIDENT', 'CONFIRM') = 0
+    IF dbo.fn_CoQuyen(@MaTaiKhoan, 'INCIDENT', 'CONFIRM') = 0
         THROW 50403, N'Tai khoan khong co quyen xu ly tin bao', 1;
     IF @QuyetDinh NOT IN (N'DaTiepNhan', N'TuChoi', N'YeuCauBoSung', N'DangXacMinh', N'DaXuLy')
         THROW 50400, N'Quyet dinh khong hop le', 1;
-    IF NOT EXISTS (SELECT 1 FROM TinBao WHERE MaTin = @MaTin)
+    IF NOT EXISTS (SELECT 1 FROM TinBao WHERE MaTinBao = @MaTinBao)
         THROW 50404, N'Khong tim thay tin bao', 1;
 
     EXEC sys.sp_set_session_context @key = N'user_id', @value = @MaTaiKhoan;
@@ -42,7 +42,7 @@ BEGIN
     UPDATE TinBao
        SET TrangThai = @QuyetDinh,
            MaTaiKhoanTiepNhan = ISNULL(MaTaiKhoanTiepNhan, @MaTaiKhoan)
-     WHERE MaTin = @MaTin;
+     WHERE MaTinBao = @MaTinBao;
 END
 GO
 
@@ -50,18 +50,18 @@ GO
 CREATE OR ALTER PROCEDURE sp_LapHoSoThiThe
     @MaTaiKhoan BIGINT, @ThoiGianPhatHien DATETIME2, @DiaDiem NVARCHAR(255),
     @GioiTinh NVARCHAR(10), @TuoiUocLuong SMALLINT = NULL, @ChieuCao DECIMAL(5,2) = NULL,
-    @DacDiemCoThe NVARCHAR(MAX) = NULL, @MaTin BIGINT = NULL,
+    @DacDiemCoThe NVARCHAR(MAX) = NULL, @MaTinBao BIGINT = NULL,
     @MaHoSoThiThe BIGINT OUTPUT
 AS
 BEGIN
     SET NOCOUNT ON; SET XACT_ABORT ON;
-    IF fn_CoQuyen(@MaTaiKhoan, 'BODY', 'CREATE') = 0
+    IF dbo.fn_CoQuyen(@MaTaiKhoan, 'BODY', 'CREATE') = 0
         THROW 50403, N'Tai khoan khong co quyen lap ho so thi the', 1;
 
     EXEC sys.sp_set_session_context @key = N'user_id', @value = @MaTaiKhoan;
 
-    INSERT HoSoThiThe (ThoiGianPhatHien, DiaDiem, GioiTinh, TuoiUocLuong, ChieuCao, DacDiemCoThe, MaTin)
-    VALUES (@ThoiGianPhatHien, @DiaDiem, @GioiTinh, @TuoiUocLuong, @ChieuCao, @DacDiemCoThe, @MaTin);
+    INSERT HoSoThiThe (ThoiGianPhatHien, DiaDiem, GioiTinh, TuoiUocLuong, ChieuCao, DacDiemCoThe, MaTinBao)
+    VALUES (@ThoiGianPhatHien, @DiaDiem, @GioiTinh, @TuoiUocLuong, @ChieuCao, @DacDiemCoThe, @MaTinBao);
 
     SET @MaHoSoThiThe = SCOPE_IDENTITY();
 END
@@ -73,7 +73,7 @@ CREATE OR ALTER PROCEDURE sp_XepViTri
 AS
 BEGIN
     SET NOCOUNT ON; SET XACT_ABORT ON;
-    IF fn_CoQuyen(@MaTaiKhoan, 'STORAGE', 'UPDATE') = 0
+    IF dbo.fn_CoQuyen(@MaTaiKhoan, 'STORAGE', 'UPDATE') = 0
         THROW 50403, N'Tai khoan khong co quyen xep vi tri luu tru', 1;
     IF NOT EXISTS (SELECT 1 FROM HoSoThiThe WHERE MaHoSoThiThe = @MaHoSoThiThe)
         THROW 50404, N'Khong tim thay ho so thi the', 1;
@@ -95,7 +95,7 @@ CREATE OR ALTER PROCEDURE sp_ChayDoiSanh
 AS
 BEGIN
     SET NOCOUNT ON; SET XACT_ABORT ON;
-    IF fn_CoQuyen(@MaTaiKhoan, 'MATCHING', 'CREATE') = 0
+    IF dbo.fn_CoQuyen(@MaTaiKhoan, 'MATCHING', 'CREATE') = 0
         THROW 50403, N'Tai khoan khong co quyen chay doi sanh', 1;
     IF NOT EXISTS (SELECT 1 FROM HoSoThiThe WHERE MaHoSoThiThe = @MaHoSoThiThe)
         THROW 50404, N'Khong tim thay ho so thi the', 1;
@@ -105,12 +105,12 @@ BEGIN
     IF OBJECT_ID('tempdb..#KetQuaDoiSanh') IS NOT NULL DROP TABLE #KetQuaDoiSanh;
 
     SELECT s.MaHoSoMatTich, s.DiemCoBan, s.DiemDiaDiem, s.DiemThoiGian,
-           fn_TongDiem(s.DiemCoBan, s.DiemDiaDiem, s.DiemThoiGian) AS TongDiem
+           dbo.fn_TongDiem(s.DiemCoBan, s.DiemDiaDiem, s.DiemThoiGian) AS TongDiem
     INTO #KetQuaDoiSanh
     FROM (SELECT m.MaHoSoMatTich,
-                 fn_DiemCoBan(@MaHoSoThiThe, m.MaHoSoMatTich)   AS DiemCoBan,
-                 fn_DiemDiaDiem(@MaHoSoThiThe, m.MaHoSoMatTich) AS DiemDiaDiem,
-                 fn_DiemThoiGian(@MaHoSoThiThe, m.MaHoSoMatTich) AS DiemThoiGian
+                 dbo.fn_DiemCoBan(@MaHoSoThiThe, m.MaHoSoMatTich)   AS DiemCoBan,
+                 dbo.fn_DiemDiaDiem(@MaHoSoThiThe, m.MaHoSoMatTich) AS DiemDiaDiem,
+                 dbo.fn_DiemThoiGian(@MaHoSoThiThe, m.MaHoSoMatTich) AS DiemThoiGian
           FROM HoSoNguoiMatTich m
           WHERE m.TrangThai IN (N'DangTimKiem', N'CoHoSoNghiVan')
             AND NOT EXISTS (SELECT 1 FROM DoiSanh x
@@ -159,7 +159,7 @@ CREATE OR ALTER PROCEDURE sp_TaoXacMinh
 AS
 BEGIN
     SET NOCOUNT ON; SET XACT_ABORT ON;
-    IF fn_CoQuyen(@MaTaiKhoan, 'VERIFICATION', 'CREATE') = 0
+    IF dbo.fn_CoQuyen(@MaTaiKhoan, 'VERIFICATION', 'CREATE') = 0
         THROW 50403, N'Tai khoan khong co quyen tao phien xac minh', 1;
     IF NOT EXISTS (SELECT 1 FROM DoiSanh WHERE MaDoiSanh = @MaDoiSanh)
         THROW 50404, N'Khong tim thay ket qua doi sanh', 1;
@@ -180,7 +180,7 @@ CREATE OR ALTER PROCEDURE sp_KetLuanXacMinh
 AS
 BEGIN
     SET NOCOUNT ON; SET XACT_ABORT ON;
-    IF fn_CoQuyen(@MaTaiKhoan, 'VERIFICATION', 'CONFIRM') = 0
+    IF dbo.fn_CoQuyen(@MaTaiKhoan, 'VERIFICATION', 'CONFIRM') = 0
         THROW 50403, N'Tai khoan khong co quyen ket luan xac minh', 1;
 
     DECLARE @tt NVARCHAR(30), @nguoiTH BIGINT;
@@ -221,7 +221,7 @@ CREATE OR ALTER PROCEDURE sp_DuyetKetLuan
 AS
 BEGIN
     SET NOCOUNT ON; SET XACT_ABORT ON;
-    IF fn_CoQuyen(@MaNguoiDuyet, 'VERIFICATION', 'APPROVE') = 0
+    IF dbo.fn_CoQuyen(@MaNguoiDuyet, 'VERIFICATION', 'APPROVE') = 0
         THROW 50403, N'Tai khoan khong co quyen duyet ket luan', 1;
     IF @QuyetDinh NOT IN (N'Duyet', N'TuChoi')
         THROW 50400, N'Quyet dinh khong hop le (Duyet / TuChoi)', 1;
@@ -249,7 +249,7 @@ CREATE OR ALTER PROCEDURE sp_LapBanGiao
 AS
 BEGIN
     SET NOCOUNT ON; SET XACT_ABORT ON;
-    IF fn_CoQuyen(@MaTaiKhoan, 'HANDOVER', 'CREATE') = 0
+    IF dbo.fn_CoQuyen(@MaTaiKhoan, 'HANDOVER', 'CREATE') = 0
         THROW 50403, N'Tai khoan khong co quyen lap phieu ban giao', 1;
 
     EXEC sys.sp_set_session_context @key = N'user_id', @value = @MaTaiKhoan;
@@ -274,24 +274,24 @@ BEGIN
 
     IF @Buoc = 'KIEMTRA'
     BEGIN
-        IF fn_CoQuyen(@MaTaiKhoan, 'HANDOVER', 'UPDATE') = 0 THROW 50403, N'Khong co quyen kiem tra ban giao', 1;
+        IF dbo.fn_CoQuyen(@MaTaiKhoan, 'HANDOVER', 'UPDATE') = 0 THROW 50403, N'Khong co quyen kiem tra ban giao', 1;
         UPDATE BanGiao SET TrangThai = N'DangKiemTra' WHERE MaBanGiao = @MaBanGiao;
     END
     ELSE IF @Buoc = 'GIAO'
     BEGIN
-        IF fn_CoQuyen(@MaTaiKhoan, 'HANDOVER', 'HANDOVER') = 0 THROW 50403, N'Khong co quyen giao thi the', 1;
+        IF dbo.fn_CoQuyen(@MaTaiKhoan, 'HANDOVER', 'HANDOVER') = 0 THROW 50403, N'Khong co quyen giao thi the', 1;
         UPDATE BanGiao
            SET TrangThai = N'DaGiao', ThoiGian = SYSDATETIME(), DiaDiem = ISNULL(@DiaDiem, DiaDiem)
          WHERE MaBanGiao = @MaBanGiao;
     END
     ELSE IF @Buoc = 'XACNHAN'
     BEGIN
-        IF fn_CoQuyen(@MaTaiKhoan, 'HANDOVER', 'CONFIRM') = 0 THROW 50403, N'Khong co quyen xac nhan ban giao', 1;
+        IF dbo.fn_CoQuyen(@MaTaiKhoan, 'HANDOVER', 'CONFIRM') = 0 THROW 50403, N'Khong co quyen xac nhan ban giao', 1;
         UPDATE BanGiao SET TrangThai = N'DaXacNhan' WHERE MaBanGiao = @MaBanGiao;
     END
     ELSE IF @Buoc = 'HUY'
     BEGIN
-        IF fn_CoQuyen(@MaTaiKhoan, 'HANDOVER', 'CREATE') = 0 THROW 50403, N'Khong co quyen huy ban giao', 1;
+        IF dbo.fn_CoQuyen(@MaTaiKhoan, 'HANDOVER', 'CREATE') = 0 THROW 50403, N'Khong co quyen huy ban giao', 1;
         UPDATE BanGiao SET TrangThai = N'Huy' WHERE MaBanGiao = @MaBanGiao;
     END
     ELSE
@@ -305,7 +305,7 @@ CREATE OR ALTER PROCEDURE sp_DongHoSoThiThe
 AS
 BEGIN
     SET NOCOUNT ON; SET XACT_ABORT ON;
-    IF fn_CoQuyen(@MaTaiKhoan, 'BODY', 'UPDATE') = 0
+    IF dbo.fn_CoQuyen(@MaTaiKhoan, 'BODY', 'UPDATE') = 0
         THROW 50403, N'Tai khoan khong co quyen dong ho so', 1;
     IF NOT EXISTS (SELECT 1 FROM HoSoThiThe WHERE MaHoSoThiThe = @MaHoSoThiThe AND TrangThai = N'DaBanGiao')
         THROW 50400, N'Chi dong duoc ho so o trang thai DaBanGiao', 1;
@@ -322,7 +322,7 @@ CREATE OR ALTER PROCEDURE sp_MoLaiHoSoThiThe
 AS
 BEGIN
     SET NOCOUNT ON; SET XACT_ABORT ON;
-    IF fn_CoQuyen(@MaTaiKhoan, 'BODY', 'UPDATE') = 0
+    IF dbo.fn_CoQuyen(@MaTaiKhoan, 'BODY', 'UPDATE') = 0
         THROW 50403, N'Tai khoan khong co quyen mo lai ho so', 1;
     IF NULLIF(LTRIM(RTRIM(@LyDo)), N'') IS NULL
         THROW 50400, N'Mo lai ho so bat buoc nhap ly do', 1;
@@ -509,7 +509,7 @@ CREATE OR ALTER PROCEDURE sp_KhoaMoKhoaTaiKhoan
 AS
 BEGIN
     SET NOCOUNT ON; SET XACT_ABORT ON;
-    IF fn_CoQuyen(@MaTaiKhoanAdmin, 'ACCOUNT', 'UPDATE') = 0
+    IF dbo.fn_CoQuyen(@MaTaiKhoanAdmin, 'ACCOUNT', 'UPDATE') = 0
         THROW 50403, N'Tai khoan khong co quyen quan ly trang thai tai khoan.', 1;
     IF @TrangThaiMoi NOT IN (N'HoatDong', N'Khoa')
         THROW 50400, N'Trang thai cap nhat khong hop le.', 1;
@@ -535,7 +535,7 @@ CREATE OR ALTER PROCEDURE sp_PhanQuyenVaiTro
 AS
 BEGIN
     SET NOCOUNT ON; SET XACT_ABORT ON;
-    IF fn_CoQuyen(@MaTaiKhoanAdmin, 'PERMISSION', 'UPDATE') = 0
+    IF dbo.fn_CoQuyen(@MaTaiKhoanAdmin, 'PERMISSION', 'UPDATE') = 0
         THROW 50403, N'Tai khoan khong co quyen phan quyen.', 1;
 
     IF @HanhDong = 'GAN'
@@ -581,7 +581,7 @@ CREATE OR ALTER PROCEDURE sp_ThemHinhAnh
 AS
 BEGIN
     SET NOCOUNT ON; SET XACT_ABORT ON;
-    IF fn_CoQuyen(@MaTaiKhoanTaiLen, 'FILE', 'CREATE') = 0
+    IF dbo.fn_CoQuyen(@MaTaiKhoanTaiLen, 'FILE', 'CREATE') = 0
         THROW 50403, N'Tai khoan khong co quyen tai hinh anh len.', 1;
 
     IF @MaHoSoThiThe IS NOT NULL
@@ -623,8 +623,8 @@ AS
 BEGIN
     SET NOCOUNT ON;
     DECLARE @CoQuyenXemToanBo BIT = 0;
-    IF fn_CoQuyen(@MaTaiKhoanTruyCap, 'BODY', 'VIEW') = 1 
-       OR fn_CoQuyen(@MaTaiKhoanTruyCap, 'FILE', 'VIEW') = 1
+    IF dbo.fn_CoQuyen(@MaTaiKhoanTruyCap, 'BODY', 'VIEW') = 1 
+       OR dbo.fn_CoQuyen(@MaTaiKhoanTruyCap, 'FILE', 'VIEW') = 1
     BEGIN
         SET @CoQuyenXemToanBo = 1;
     END
@@ -671,7 +671,7 @@ BEGIN
     IF @NguoiTao IS NULL
         THROW 50404, N'Khong tim thay hinh anh can xoa.', 1;
 
-    IF @NguoiTao <> @MaTaiKhoan AND fn_CoQuyen(@MaTaiKhoan, 'FILE', 'DELETE') = 0
+    IF @NguoiTao <> @MaTaiKhoan AND dbo.fn_CoQuyen(@MaTaiKhoan, 'FILE', 'DELETE') = 0
         THROW 50403, N'Tai khoan khong co quyen xoa hinh anh nay.', 1;
 
     UPDATE HinhAnh SET TrangThai = N'DaXoa' WHERE MaHinhAnh = @MaHinhAnh;
