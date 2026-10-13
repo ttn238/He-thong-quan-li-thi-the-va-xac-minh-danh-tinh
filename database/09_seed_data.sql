@@ -121,60 +121,36 @@ AND MaQuyen NOT IN (SELECT MaQuyen FROM dbo.VaiTro_Quyen WHERE MaVaiTro = @CongA
 
 INSERT dbo.VaiTro_Quyen (MaVaiTro, MaQuyen, PhamVi)
 SELECT @CongAnDuyet, q.MaQuyen, 'ALL'
-FROM dbo.QuyenHeThong q 
-WHERE q.Resource = 'VERIFICATION' AND q.[Action] = 'APPROVE'
-AND q.MaQuyen NOT IN (SELECT MaQuyen FROM dbo.VaiTro_Quyen WHERE MaVaiTro = @CongAnDuyet);
+FROM dbo.QuyenHeThong q WHERE q.Resource = 'VERIFICATION' AND q.[Action] = 'APPROVE';
 
-/* 4. THAM SỐ HỆ THỐNG */
-IF NOT EXISTS (SELECT 1 FROM dbo.ThamSoHeThong)
-BEGIN
-    INSERT dbo.ThamSoHeThong (TenThamSo, GiaTri, MoTa) VALUES
-     ('MATCH_W_BASIC',       N'50',  N'Trọng số: giới tính, tuổi'),
-     ('MATCH_W_LOCATION',    N'30',  N'Trọng số: địa điểm'),
-     ('MATCH_W_TIME',        N'20',  N'Trọng số: thời gian'),
-     ('MATCH_T_POSSIBLE',    N'50',  N'Điểm > ngưỡng này: có khả năng'),
-     ('MATCH_T_VERIFY',      N'75',  N'Điểm > ngưỡng này: cần xác minh'),
-     ('MATCH_T_PRIORITY',    N'90',  N'Điểm > ngưỡng này: ưu tiên xác minh'),
-     ('UPLOAD_MAX_MB',       N'10',  N'Dung lượng tối đa mỗi tệp (MB)'),
-     ('OCR_MIN_CONFIDENCE',  N'60',  N'Độ tin cậy OCR tối thiểu (%) để tự điền dữ liệu'),
-     ('REVIEW_INTERVAL_DAYS',N'30',  N'Chu kỳ nhắc rà soát hồ sơ chưa xác định (ngày)');
-END
+/* 4. Tham so he thong (INSERT 1 cau de tong trong so = 100 ngay luc ket thuc cau lenh) */
+INSERT dbo.ThamSoHeThong (TenThamSo, GiaTri, MoTa) VALUES
+ ('MATCH_W_BASIC',       N'50',  N'Trọng số: giới tính, tuổi'),
+ ('MATCH_W_LOCATION',    N'30',  N'Trọng số: địa điểm'),
+ ('MATCH_W_TIME',        N'20',  N'Trọng số: thời gian'),
+ ('MATCH_T_POSSIBLE',    N'50',  N'Điểm > ngưỡng này: có khả năng'),
+ ('MATCH_T_VERIFY',      N'75',  N'Điểm > ngưỡng này: cần xác minh'),
+ ('MATCH_T_PRIORITY',    N'90',  N'Điểm > ngưỡng này: ưu tiên xác minh'),
+ ('UPLOAD_MAX_MB',       N'10',  N'Dung lượng tối đa mỗi tệp (MB)'),
+ ('OCR_MIN_CONFIDENCE',  N'60',  N'Độ tin cậy OCR tối thiểu (%) để tự điền dữ liệu'),
+ ('REVIEW_INTERVAL_DAYS',N'30',  N'Chu kỳ nhắc rà soát hồ sơ chưa xác định (ngày)');
 
-/* 5. DANH MỤC */
-IF NOT EXISTS (SELECT 1 FROM dbo.LoaiTinBao)
-BEGIN
-    INSERT dbo.LoaiTinBao (TenLoai) VALUES
-     (N'Tai nạn giao thông'), (N'Phát hiện người tử vong'), (N'Đuối nước'), (N'Cháy nổ'), (N'Khác');
-END
+/* 5. Danh muc */
+INSERT dbo.LoaiTinBao (TenLoai) VALUES
+ (N'Tai nạn giao thông'), (N'Phát hiện người tử vong'), (N'Đuối nước'), (N'Cháy nổ'), (N'Khác');
 
-IF NOT EXISTS (SELECT 1 FROM dbo.LoaiDoVat)
-BEGIN
-    INSERT dbo.LoaiDoVat (TenLoai) VALUES
-     (N'Điện thoại'), (N'Ví / bóp'), (N'Giấy tờ tùy thân'), (N'Chìa khóa'),
-     (N'Quần áo'), (N'Trang sức'), (N'Khác');
-END
+INSERT dbo.LoaiDoVat (TenLoai) VALUES
+ (N'Điện thoại'), (N'Ví / bóp'), (N'Giấy tờ tùy thân'), (N'Chìa khóa'),
+ (N'Quần áo'), (N'Trang sức'), (N'Khác');
 
-/* 6. VỊ TRÍ LƯU TRỮ */
-IF NOT EXISTS (SELECT 1 FROM dbo.ViTriLuuTru)
-BEGIN
-    INSERT dbo.ViTriLuuTru (Khu, Tu, Ngan, SucChua) VALUES
-     (N'A', N'A01', N'N01', 1), (N'A', N'A01', N'N02', 1), (N'A', N'A01', N'N03', 1), (N'A', N'A01', N'N04', 1),
-     (N'A', N'A02', N'N01', 1), (N'A', N'A02', N'N02', 1);
-END
+/* 6. Cau truc luu tru mau: Khu A -> Tu A01 (4 ngan), Tu A02 (2 ngan) */
+INSERT dbo.ViTriLuuTru (Khu, Tu, Ngan, SucChua) VALUES
+ (N'A', N'A01', N'N01', 1), (N'A', N'A01', N'N02', 1), (N'A', N'A01', N'N03', 1), (N'A', N'A01', N'N04', 1),
+ (N'A', N'A02', N'N01', 1), (N'A', N'A02', N'N02', 1);
 
-/* 7. TÀI KHOẢN MẪU (Bao gồm Admin, Cán bộ, Nhà xác, Người dân)
-   Mật khẩu mặc định:
-     - Admin:    Admin@123
-     - Cán bộ:   Canbo@123
-     - Nhà xác:  Nhaxac@123
-     - Người dân: User@123
-   Chuỗi băm chuẩn PBKDF2/HMAC-SHA256 (100000 vòng lặp kèm Salt):
-   100000.kh6sXiu8EcrIcTL5NBOzvg==.SwFY+yE3YNgbiVR3IgzeoadrUXTfa1/PY4S/3a2Rmaw=
-*/
-DECLARE @DefaultHash VARCHAR(255) = '100000.kh6sXiu8EcrIcTL5NBOzvg==.SwFY+yE3YNgbiVR3IgzeoadrUXTfa1/PY4S/3a2Rmaw=';
-
-INSERT dbo.TaiKhoanNguoiDung (TenDangNhap, Email, SoDienThoai, CCCD, MatKhauHash, HoTen, DonVi, ChucVu, MaVaiTro, TrangThai)
-SELECT v.TenDangNhap, v.Email, v.SDT, v.CCCD, @DefaultHash, v.HoTen, v.DonVi, v.ChucVu, r.MaVaiTro, N'HoatDong'
+/* 7. Tai khoan mau (MatKhauHash la CHO GIU CHO - thay bang bcrypt/argon2 that khi chay ung dung) */
+INSERT dbo.TaiKhoanNguoiDung (TenDangNhap, Email, SoDienThoai, MatKhauHash, HoTen, DonVi, MaVaiTro)
+SELECT v.TenDangNhap, v.Email, v.SDT, CONVERT(VARCHAR(64), HASHBYTES('SHA2_256', '123456'), 2), v.HoTen, v.DonVi, r.MaVaiTro
 FROM (VALUES
  ('admin',    'admin@demo.local',    '0900000001', '001090000001', N'Quản trị viên Hệ thống', N'Phòng Công nghệ thông tin', N'Quản trị viên',       'ADMIN'),
  ('canbo01',  'canbo01@demo.local',  '0900000002', '001090000002', N'Nguyễn Văn An',          N'Công an Quận 1',            N'Cán bộ điều tra',     'CONG_AN'),
