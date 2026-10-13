@@ -57,4 +57,9 @@ public static class PasswordHasher
 
         return CryptographicOperations.FixedTimeEquals(actualHash, expectedHash);
     }
+
+    /// <summary>
+    /// Alias for VerifyPassword
+    /// </summary>
+    public static bool Verify(string password, string hashedPassword) => VerifyPassword(password, hashedPassword);
 }
