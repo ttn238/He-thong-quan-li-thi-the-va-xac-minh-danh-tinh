@@ -1,29 +1,38 @@
-var builder = WebApplication.CreateBuilder(args);
+using DeathManagement.API.Data;
+using DeathManagement.API.Forms;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
-// Add services to the container.
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
+namespace DeathManagement.API;
 
-// Dependency Injection
-builder.Services.AddSingleton<DeathManagement.API.Repositories.Interfaces.IUserRepository, DeathManagement.API.Repositories.UserRepository>();
-builder.Services.AddScoped<DeathManagement.API.Services.Interfaces.IUserService, DeathManagement.API.Services.UserService>();
-
-builder.Services.AddAuthentication();
-builder.Services.AddAuthorization();
-
-
-var app = builder.Build();
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+static class Program
 {
-    // Development configuration
+    // Đọc chuỗi kết nối từ appsettings.json
+    static readonly DbContextOptions<ApplicationDbContext> Options =
+        new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSqlServer(new ConfigurationBuilder()
+                .SetBasePath(AppContext.BaseDirectory)
+                .AddJsonFile("appsettings.json")
+                .Build()
+                .GetConnectionString("DefaultConnection"))
+            .Options;
+
+    // Mỗi lần cần truy cập CSDL thì tạo một DbContext mới
+    public static ApplicationDbContext NewDb() => new(Options);
+
+    [STAThread]
+    static void Main()
+    {
+        ApplicationConfiguration.Initialize();
+
+        while (true)
+        {
+            using var login = new FrmLogin();
+            if (login.ShowDialog() != DialogResult.OK) break;     // đóng form đăng nhập = thoát
+
+            using var home = new FrmDashboard();
+            home.ShowDialog();
+            if (home.DialogResult != DialogResult.Retry) break;   // bấm Đăng xuất = quay lại đăng nhập
+        }
+    }
 }
-
-app.UseHttpsRedirection();
-app.UseAuthentication();
-app.UseAuthorization();
-
-app.MapControllers();
-
-app.Run();
