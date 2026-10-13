@@ -86,6 +86,22 @@ GO
 /* 11. UNIQUE co dieu kien (luat nghiep vu) */
 CREATE UNIQUE INDEX UQ_TaiKhoan_Email ON TaiKhoanNguoiDung(Email)       WHERE Email IS NOT NULL;
 CREATE UNIQUE INDEX UQ_TaiKhoan_SDT   ON TaiKhoanNguoiDung(SoDienThoai) WHERE SoDienThoai IS NOT NULL;
+CREATE UNIQUE INDEX UQ_TaiKhoan_CCCD  ON TaiKhoanNguoiDung(CCCD)        WHERE CCCD IS NOT NULL;
 -- Moi ket luan xac minh chi co 1 phieu ban giao con hieu luc
 CREATE UNIQUE INDEX UQ_BanGiao_HieuLuc ON BanGiao(MaXacMinh) WHERE TrangThai <> N'Huy';
+GO
+
+/* 12. Rang buoc kiem tra bang HinhAnh */
+ALTER TABLE HinhAnh ADD
+    CONSTRAINT CK_HinhAnh_KichThuoc
+        CHECK (KichThuoc > 0),
+    CONSTRAINT CK_HinhAnh_TrangThai
+        CHECK (TrangThai IN (N'HoatDong', N'DaXoa', N'An')),
+    CONSTRAINT CK_HinhAnh_ThuocDoiTuong
+        CHECK (MaHoSoThiThe IS NOT NULL 
+            OR MaHoSoMatTich IS NOT NULL 
+            OR MaTinBao IS NOT NULL 
+            OR MaXacMinh IS NOT NULL),
+    CONSTRAINT CK_HinhAnh_ThiThe_NhayCam
+        CHECK (MaHoSoThiThe IS NULL OR LaNhayCam = 1);
 GO

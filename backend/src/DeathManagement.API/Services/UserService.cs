@@ -1,0 +1,189 @@
+using DeathManagement.API.DTOs.User;
+using DeathManagement.API.Entities;
+using DeathManagement.API.Repositories.Interfaces;
+using DeathManagement.API.Security;
+using DeathManagement.API.Services.Interfaces;
+
+namespace DeathManagement.API.Services;
+
+public class UserService : IUserService
+{
+    private readonly IUserRepository _userRepository;
+
+    public UserService(IUserRepository userRepository)
+    {
+        _userRepository = userRepository;
+    }
+
+    public async Task<PagedResult<UserDto>> GetPagedListAsync(UserFilterRequest filter)
+    {
+        var pagedUsers = await _userRepository.GetPagedListAsync(filter);
+
+        var dtos = pagedUsers.Items.Select(MapToDto).ToList();
+
+        return new PagedResult<UserDto>
+        {
+            Items = dtos,
+            TotalCount = pagedUsers.TotalCount,
+            PageIndex = pagedUsers.PageIndex,
+            PageSize = pagedUsers.PageSize
+        };
+    }
+
+    public async Task<UserDto?> GetByIdAsync(long id)
+    {
+        var user = await _userRepository.GetByIdAsync(id);
+        return user == null ? null : MapToDto(user);
+    }
+
+    public async Task<UserDto?> GetByUsernameAsync(string username)
+    {
+        var user = await _userRepository.GetByUsernameAsync(username);
+        return user == null ? null : MapToDto(user);
+    }
+
+    public async Task<UserDto> CreateAsync(CreateUserRequest request)
+    {
+        // Kiểm tra trùng lặp
+        if (await _userRepository.ExistsByUsernameAsync(request.TenDangNhap))
+            throw new InvalidOperationException($"Tên đăng nhập '{request.TenDangNhap}' đã được sử dụng.");
+
+        if (!string.IsNullOrWhiteSpace(request.Email) && await _userRepository.ExistsByEmailAsync(request.Email))
+            throw new InvalidOperationException($"Email '{request.Email}' đã được sử dụng.");
+
+        if (!string.IsNullOrWhiteSpace(request.SoDienThoai) && await _userRepository.ExistsByPhoneAsync(request.SoDienThoai))
+            throw new InvalidOperationException($"Số điện thoại '{request.SoDienThoai}' đã được sử dụng.");
+
+        if (!string.IsNullOrWhiteSpace(request.CCCD) && await _userRepository.ExistsByCccdAsync(request.CCCD))
+            throw new InvalidOperationException($"Số CCCD '{request.CCCD}' đã được sử dụng.");
+
+        // Băm mật khẩu bằng PBKDF2 chuẩn bảo mật
+        string passwordHash = PasswordHasher.HashPassword(request.MatKhau);
+
+        var newUser = new User
+        {
+            TenDangNhap = request.TenDangNhap.Trim(),
+            MatKhauHash = passwordHash,
+            HoTen = request.HoTen.Trim(),
+            Email = request.Email?.Trim(),
+            SoDienThoai = request.SoDienThoai?.Trim(),
+            CCCD = request.CCCD?.Trim(),
+            DonVi = request.DonVi?.Trim(),
+            ChucVu = request.ChucVu?.Trim(),
+            MaVaiTro = request.MaVaiTro,
+            TrangThai = "HoatDong",
+            SoLanDangNhapSai = 0,
+            NgayTao = DateTime.UtcNow,
+            NgayCapNhat = DateTime.UtcNow
+        };
+
+        var created = await _userRepository.CreateAsync(newUser);
+        return MapToDto(created);
+    }
+
+    public async Task<UserDto?> UpdateAsync(long id, UpdateUserRequest request)
+    {
+        var existing = await _userRepository.GetByIdAsync(id);
+        if (existing == null) return null;
+
+        // Kiểm tra trùng lặp email, sdt, cccd ngoại trừ chính user này
+        if (!string.IsNullOrWhiteSpace(request.Email) && await _userRepository.ExistsByEmailAsync(request.Email, id))
+            throw new InvalidOperationException($"Email '{request.Email}' đã được sử dụng bởi tài khoản khác.");
+
+        if (!string.IsNullOrWhiteSpace(request.SoDienThoai) && await _userRepository.ExistsByPhoneAsync(request.SoDienThoai, id))
+            throw new InvalidOperationException($"Số điện thoại '{request.SoDienThoai}' đã được sử dụng bởi tài khoản khác.");
+
+        if (!string.IsNullOrWhiteSpace(request.CCCD) && await _userRepository.ExistsByCccdAsync(request.CCCD, id))
+            throw new InvalidOperationException($"Số CCCD '{request.CCCD}' đã được sử dụng bởi tài khoản khác.");
+
+        existing.HoTen = request.HoTen.Trim();
+        existing.Email = request.Email?.Trim();
+        existing.SoDienThoai = request.SoDienThoai?.Trim();
+        existing.CCCD = request.CCCD?.Trim();
+        existing.DonVi = request.DonVi?.Trim();
+        existing.ChucVu = request.ChucVu?.Trim();
+        existing.MaVaiTro = request.MaVaiTro;
+        existing.NgayCapNhat = DateTime.UtcNow;
+
+        var updated = await _userRepository.UpdateAsync(existing);
+        return MapToDto(updated);
+    }
+
+    public async Task<UserDto?> UpdateProfileAsync(long currentUserId, UpdateProfileRequest request)
+    {
+        var existing = await _userRepository.GetByIdAsync(currentUserId);
+        if (existing == null) return null;
+
+        if (!string.IsNullOrWhiteSpace(request.Email) && await _userRepository.ExistsByEmailAsync(request.Email, currentUserId))
+            throw new InvalidOperationException($"Email '{request.Email}' đã được sử dụng bởi tài khoản khác.");
+
+        if (!string.IsNullOrWhiteSpace(request.SoDienThoai) && await _userRepository.ExistsByPhoneAsync(request.SoDienThoai, currentUserId))
+            throw new InvalidOperationException($"Số điện thoại '{request.SoDienThoai}' đã được sử dụng bởi tài khoản khác.");
+
+        existing.HoTen = request.HoTen.Trim();
+        existing.Email = request.Email?.Trim();
+        existing.SoDienThoai = request.SoDienThoai?.Trim();
+        existing.NgayCapNhat = DateTime.UtcNow;
+
+        var updated = await _userRepository.UpdateAsync(existing);
+        return MapToDto(updated);
+    }
+
+    public async Task<bool> ChangeStatusAsync(long adminId, long targetUserId, ChangeUserStatusRequest request)
+    {
+        // Chống quản trị viên tự khóa tài khoản của chính mình
+        if (adminId == targetUserId && string.Equals(request.TrangThai, "Khoa", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Quản trị viên không thể tự khóa tài khoản của chính mình.");
+        }
+
+        return await _userRepository.UpdateStatusAsync(targetUserId, request.TrangThai);
+    }
+
+    public async Task<bool> ResetPasswordAsync(long adminId, long targetUserId, ResetPasswordRequest request)
+    {
+        string newPasswordHash = PasswordHasher.HashPassword(request.MatKhauMoi);
+        return await _userRepository.UpdatePasswordAsync(targetUserId, newPasswordHash);
+    }
+
+    public async Task<bool> DeleteAsync(long adminId, long targetUserId)
+    {
+        if (adminId == targetUserId)
+        {
+            throw new InvalidOperationException("Quản trị viên không thể tự xóa tài khoản của chính mình.");
+        }
+
+        return await _userRepository.DeleteAsync(targetUserId);
+    }
+
+    private static UserDto MapToDto(User user)
+    {
+        string tenVaiTro = user.MaVaiTro switch
+        {
+            1 => "QuanTriVien",
+            2 => "CanBoGiamDinh",
+            3 => "NguoiDan",
+            _ => "KhongXacDinh"
+        };
+
+        return new UserDto
+        {
+            MaTaiKhoan = user.MaTaiKhoan,
+            TenDangNhap = user.TenDangNhap,
+            HoTen = user.HoTen,
+            Email = user.Email,
+            SoDienThoai = user.SoDienThoai,
+            CCCD = user.CCCD,
+            DonVi = user.DonVi,
+            ChucVu = user.ChucVu,
+            MaVaiTro = user.MaVaiTro,
+            TenVaiTro = tenVaiTro,
+            TrangThai = user.TrangThai,
+            SoLanDangNhapSai = user.SoLanDangNhapSai,
+            KhoaDenThoiDiem = user.KhoaDenThoiDiem,
+            LanDangNhapCuoi = user.LanDangNhapCuoi,
+            NgayTao = user.NgayTao,
+            NgayCapNhat = user.NgayCapNhat
+        };
+    }
+}

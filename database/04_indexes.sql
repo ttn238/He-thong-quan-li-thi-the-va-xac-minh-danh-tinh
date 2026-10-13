@@ -28,4 +28,15 @@ CREATE INDEX IX_BanGiao_NguoiThan        ON BanGiao(MaNguoiThan);
 CREATE INDEX IX_BanGiao_NguoiGiao        ON BanGiao(MaNguoiGiao);
 CREATE INDEX IX_NhatKy_TaiKhoan_ThoiGian ON NhatKyHeThong(MaTaiKhoan, ThoiGian DESC);
 CREATE INDEX IX_ThongBao_TaiKhoan        ON ThongBao(MaTaiKhoan, TrangThaiDoc);
+
+-- Chi muc cho LichSuDangNhap & HinhAnh
+CREATE INDEX IX_LichSuDangNhap_ThoiGian  ON LichSuDangNhap(ThoiGian DESC);
+CREATE INDEX IX_LichSuDangNhap_TaiKhoan  ON LichSuDangNhap(MaTaiKhoan);
+
+CREATE INDEX IX_HinhAnh_HoSoThiThe       ON HinhAnh(MaHoSoThiThe) WHERE TrangThai = N'HoatDong';
+CREATE INDEX IX_HinhAnh_HoSoMatTich      ON HinhAnh(MaHoSoMatTich) WHERE TrangThai = N'HoatDong';
+CREATE INDEX IX_HinhAnh_TinBao           ON HinhAnh(MaTinBao) WHERE TrangThai = N'HoatDong';
+CREATE INDEX IX_HinhAnh_XacMinh          ON HinhAnh(MaXacMinh) WHERE TrangThai = N'HoatDong';
+CREATE INDEX IX_HinhAnh_TaiKhoanTaiLen   ON HinhAnh(MaTaiKhoanTaiLen);
+CREATE INDEX IX_HinhAnh_KhongNhayCam     ON HinhAnh(LaNhayCam, TrangThai);
 GO
