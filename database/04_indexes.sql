@@ -6,7 +6,7 @@ CREATE INDEX IX_VaiTroQuyen_MaQuyen      ON VaiTro_Quyen(MaQuyen);
 CREATE INDEX IX_TinBao_MaLoaiTinBao      ON TinBao(MaLoaiTinBao);
 CREATE INDEX IX_TinBao_TiepNhan          ON TinBao(MaTaiKhoanTiepNhan);
 CREATE INDEX IX_TepTinBao_TinBao ON TepTinBao(MaTinBao);
-CREATE INDEX IX_HoSoThiThe_MaTin         ON HoSoThiThe(MaTin);
+CREATE INDEX IX_HoSoThiThe_MaTin         ON HoSoThiThe(MaTinBao);
 CREATE INDEX IX_NguoiThan_HoSoMatTich    ON NguoiThan(MaHoSoMatTich);
 CREATE INDEX IX_TepTin_HoSoThiThe        ON TepTin(MaHoSoThiThe);
 CREATE INDEX IX_TepTin_HoSoMatTich       ON TepTin(MaHoSoMatTich);

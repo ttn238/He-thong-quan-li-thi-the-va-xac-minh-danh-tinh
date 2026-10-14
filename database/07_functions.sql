@@ -1,4 +1,4 @@
-USE QL_XACMINHTHITHE;
+﻿USE QL_XACMINHTHITHE;
 GO
 SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
@@ -148,7 +148,7 @@ BEGIN
     END
 
     -- Tuoi: tuoi cua nguoi mat tich tai thoi diem mat tich so voi tuoi uoc luong cua thi the
-    SET @tuoiM = fn_TinhTuoi(@ns, CAST(ISNULL(@tg, SYSDATETIME()) AS DATE));
+    SET @tuoiM = dbo.fn_TinhTuoi(@ns, CAST(ISNULL(@tg, SYSDATETIME()) AS DATE));
     IF @tuoiM IS NOT NULL AND @tuoiT IS NOT NULL
     BEGIN
         SET @d = ABS(@tuoiM - @tuoiT);
@@ -212,11 +212,11 @@ BEGIN
     DECLARE @num DECIMAL(18,4) = 0, @den DECIMAL(18,4) = 0, @w DECIMAL(10,2);
 
     IF @DiemCoBan IS NOT NULL
-    BEGIN SET @w = fn_ThamSoSo('MATCH_W_BASIC', 50);    SET @num += @w * @DiemCoBan;    SET @den += @w; END
+    BEGIN SET @w = dbo.fn_ThamSoSo('MATCH_W_BASIC', 50);    SET @num += @w * @DiemCoBan;    SET @den += @w; END
     IF @DiemDiaDiem IS NOT NULL
-    BEGIN SET @w = fn_ThamSoSo('MATCH_W_LOCATION', 30); SET @num += @w * @DiemDiaDiem;  SET @den += @w; END
+    BEGIN SET @w = dbo.fn_ThamSoSo('MATCH_W_LOCATION', 30); SET @num += @w * @DiemDiaDiem;  SET @den += @w; END
     IF @DiemThoiGian IS NOT NULL
-    BEGIN SET @w = fn_ThamSoSo('MATCH_W_TIME', 20);     SET @num += @w * @DiemThoiGian; SET @den += @w; END
+    BEGIN SET @w = dbo.fn_ThamSoSo('MATCH_W_TIME', 20);     SET @num += @w * @DiemThoiGian; SET @den += @w; END
 
     IF @den = 0 RETURN NULL;
     RETURN ROUND(@num / @den, 2);
@@ -229,9 +229,9 @@ RETURNS NVARCHAR(30)
 AS
 BEGIN
     IF @Diem IS NULL RETURN NULL;
-    RETURN CASE WHEN @Diem > fn_ThamSoSo('MATCH_T_PRIORITY', 90) THEN N'UuTien'
-                WHEN @Diem > fn_ThamSoSo('MATCH_T_VERIFY', 75)   THEN N'CanXacMinh'
-                WHEN @Diem > fn_ThamSoSo('MATCH_T_POSSIBLE', 50) THEN N'CoKhaNang'
+    RETURN CASE WHEN @Diem > dbo.fn_ThamSoSo('MATCH_T_PRIORITY', 90) THEN N'UuTien'
+                WHEN @Diem > dbo.fn_ThamSoSo('MATCH_T_VERIFY', 75)   THEN N'CanXacMinh'
+                WHEN @Diem > dbo.fn_ThamSoSo('MATCH_T_POSSIBLE', 50) THEN N'CoKhaNang'
                 ELSE N'Thap' END;
 END
 GO
@@ -246,9 +246,9 @@ RETURN
            CASE WHEN x.Chuan = p.Chuan THEN CAST(100 AS DECIMAL(5,2))
                 ELSE CAST(100.0 * (LEN(p.Chuan) - d.Khac) / NULLIF(LEN(p.Chuan), 0) AS DECIMAL(5,2))
            END AS DoGiongNhau
-    FROM (SELECT fn_ChuanHoaBienSo(@BienSo) AS Chuan) p
+    FROM (SELECT dbo.fn_ChuanHoaBienSo(@BienSo) AS Chuan) p
     CROSS JOIN PhuongTien pt
-    CROSS APPLY (SELECT fn_ChuanHoaBienSo(pt.BienSo) AS Chuan) x
+    CROSS APPLY (SELECT dbo.fn_ChuanHoaBienSo(pt.BienSo) AS Chuan) x
     CROSS APPLY (SELECT COUNT(*) AS Khac
                  FROM (VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12),(13),(14),(15)) n(i)
                  WHERE n.i <= LEN(p.Chuan)

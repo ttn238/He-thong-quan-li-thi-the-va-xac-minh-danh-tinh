@@ -103,7 +103,7 @@ INSERT dbo.ThamSoHeThong (TenThamSo, GiaTri, MoTa) VALUES
  ('REVIEW_INTERVAL_DAYS',N'30',  N'Chu kỳ nhắc rà soát hồ sơ chưa xác định (ngày)');
 
 /* 5. Danh muc */
-INSERT dbo.LoaiTinBao (TenLoai) VALUES
+INSERT dbo.LoaiTinBao (TenLoaiTinBao) VALUES
  (N'Tai nạn giao thông'), (N'Phát hiện người tử vong'), (N'Đuối nước'), (N'Cháy nổ'), (N'Khác');
 
 INSERT dbo.LoaiDoVat (TenLoai) VALUES
@@ -117,7 +117,12 @@ INSERT dbo.ViTriLuuTru (Khu, Tu, Ngan, SucChua) VALUES
 
 /* 7. Tai khoan mau (MatKhauHash la CHO GIU CHO - thay bang bcrypt/argon2 that khi chay ung dung) */
 INSERT dbo.TaiKhoanNguoiDung (TenDangNhap, Email, SoDienThoai, MatKhauHash, HoTen, DonVi, MaVaiTro)
+<<<<<<< Updated upstream
 SELECT v.TenDangNhap, v.Email, v.SDT, 'CHANGE_ME_HASH', v.HoTen, v.DonVi, r.MaVaiTro
+=======
+--SELECT v.TenDangNhap, v.Email, v.SDT, CONVERT(VARCHAR(64), HASHBYTES('SHA2_256', '123456'), 2), v.HoTen, v.DonVi, r.MaVaiTro
+SELECT v.TenDangNhap, v.Email, v.SDT, '100000.zExbWE0oorvHzu2mLe2mqg==.BmxiAZ6+VB0zJNT8/J0Se21ucEx6oWu2SFLl/zZBqbw=', v.HoTen, v.DonVi, r.MaVaiTro
+>>>>>>> Stashed changes
 FROM (VALUES
  ('admin',    'admin@demo.local',    '0900000001', N'Quản trị viên',       N'Phòng Công nghệ thông tin', 'ADMIN'),
  ('canbo01',  'canbo01@demo.local',  '0900000002', N'Cán bộ Nguyễn Văn A', N'Công an Quận 1',            'CONG_AN'),
@@ -128,6 +133,7 @@ FROM (VALUES
 JOIN @VaiTro m    ON m.Ma = v.Ma
 JOIN dbo.VaiTro r ON r.TenVaiTro = m.Ten;
 
+<<<<<<< Updated upstream
 -- HO SO NGUOI MAT TICH --
 INSERT INTO HoSoNguoiMatTich (MaNguoiDung, HoTen, GioiTinh, Tuoi, ChieuCao, DacDiemNhanDang, Seo, HinhXam,
                               TrangPhuc, ThoiGianMatTich, DiaDiemCuoiThay, QuanHeVoiNguoiKhai, SoLienHe) VALUES
@@ -135,6 +141,13 @@ INSERT INTO HoSoNguoiMatTich (MaNguoiDung, HoTen, GioiTinh, Tuoi, ChieuCao, DacD
                               N'Áo thun xanh, quần jean', '2026-09-20 18:00', N'Đường Xuân La, Hà Nội', N'Anh em', '0912345678'),
                              (2, N'Trần Văn Cường', N'Nam', 60, 165, N'Hói đầu, đeo kính', NULL, N'Hình xăm rồng ở vai phải',
                               N'Áo sơ mi trắng', '2026-09-25 08:00', N'Chợ Bến Thành, TP.HCM', N'Con gái', '0987654321');
+=======
+USE QL_XACMINHTHITHE;
+UPDATE TaiKhoanNguoiDung
+SET MatKhauHash = '100000.zExbWE0oorvHzu2mLe2mqg==.BmxiAZ6+VB0zJNT8/J0Se21ucEx6oWu2SFLl/zZBqbw='
+WHERE LEN(MatKhauHash) = 64;   -- chỉ các tài khoản còn hash SHA256 cũ
+/* 8. HỒ SƠ MẪU PHỤC VỤ KIỂM THỬ (Khớp 100% cấu trúc bảng) */
+>>>>>>> Stashed changes
 
 -- HO SO THI THE -- 
 INSERT INTO HoSoThiThe (MaTinBao, ThoiGianPhatHien, DiaDiem, GioiTinh, TuoiUocTinh, ChieuCao, DacDiemNhanDang,
