@@ -337,9 +337,6 @@ BEGIN
     VALUES (N'MO_LAI_HO_SO', LEFT(CONCAT(N'HoSoThiThe#', @MaHoSoThiThe, N': ', @LyDo), 255), @MaTaiKhoan);
     COMMIT;
 END
-<<<<<<< Updated upstream
-GO
-=======
 GO
 
 /* =========================================================================
@@ -682,5 +679,4 @@ BEGIN
     INSERT INTO NhatKyHeThong (HanhDong, DoiTuongTacDong, MaTaiKhoan)
     VALUES (CONCAT(N'XOA_HINH_ANH#', @MaHinhAnh), CONCAT(N'HinhAnh#', @MaHinhAnh), @MaTaiKhoan);
 END
-GO
->>>>>>> Stashed changes
+GO 

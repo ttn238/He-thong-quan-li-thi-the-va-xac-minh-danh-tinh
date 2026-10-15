@@ -1,5 +1,8 @@
 USE QL_XACMINHTHITHE;
 GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
  
 CREATE TABLE VaiTro
 (
@@ -53,11 +56,18 @@ CREATE TABLE TaiKhoanNguoiDung
     TenDangNhap VARCHAR(50) NOT NULL UNIQUE,
     Email VARCHAR(150),
     SoDienThoai VARCHAR(15),
+    CCCD VARCHAR(20) NULL,
     MatKhauHash VARCHAR(255) NOT NULL,
     HoTen NVARCHAR(150) NOT NULL,
     DonVi NVARCHAR(150),
+    ChucVu NVARCHAR(100) NULL,
     TrangThai NVARCHAR(20) NOT NULL DEFAULT N'HoatDong',
     MaVaiTro INT NOT NULL,
+    SoLanDangNhapSai INT NOT NULL DEFAULT 0,
+    KhoaDenThoiDiem DATETIME2 NULL,
+    LanDangNhapCuoi DATETIME2 NULL,
+    NgayTao DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    NgayCapNhat DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
 
     CONSTRAINT FK_TaiKhoan_VaiTro
         FOREIGN KEY (MaVaiTro) REFERENCES VaiTro(MaVaiTro),
@@ -67,6 +77,23 @@ CREATE TABLE TaiKhoanNguoiDung
 
     CONSTRAINT CK_TaiKhoan_LienHe
         CHECK (Email IS NOT NULL OR SoDienThoai IS NOT NULL)
+);
+GO
+
+CREATE TABLE LichSuDangNhap
+(
+    MaLichSu BIGINT IDENTITY(1,1) PRIMARY KEY,
+    TenDangNhap VARCHAR(50) NOT NULL,
+    MaTaiKhoan BIGINT NULL,
+    ThoiGian DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    DiaChiIP VARCHAR(45) NULL,
+    UserAgent NVARCHAR(500) NULL,
+    ThanhCong BIT NOT NULL,
+    LyDoThatBai NVARCHAR(255) NULL,
+
+    CONSTRAINT FK_LichSuDangNhap_TaiKhoan
+        FOREIGN KEY (MaTaiKhoan) REFERENCES TaiKhoanNguoiDung(MaTaiKhoan)
+        ON DELETE SET NULL
 );
 GO
  
@@ -100,8 +127,7 @@ CREATE TABLE TinBao (
     SoDienThoaiNguoiBao VARCHAR(20) NULL,
     EmailNguoiBao VARCHAR(100) NULL,
 
-    MaNguoiTiepNhan INT NULL,
-    MaDonVi INT NULL,
+    MaTaiKhoanTiepNhan BIGINT NULL,
 
     MucDoUuTien NVARCHAR(20) NOT NULL DEFAULT N'BinhThuong',
     TrangThai NVARCHAR(30) NOT NULL DEFAULT N'MoiTiepNhan',
@@ -114,13 +140,9 @@ CREATE TABLE TinBao (
         FOREIGN KEY (MaLoaiTinBao)
         REFERENCES LoaiTinBao(MaLoaiTinBao),
 
-    CONSTRAINT FK_TinBao_NguoiTiepNhan
-        FOREIGN KEY (MaNguoiTiepNhan)
-        REFERENCES NguoiDung(MaNguoiDung),
-
-    CONSTRAINT FK_TinBao_DonVi
-        FOREIGN KEY (MaDonVi)
-        REFERENCES DonVi(MaDonVi),
+    CONSTRAINT FK_TinBao_TaiKhoanTiepNhan
+        FOREIGN KEY (MaTaiKhoanTiepNhan)
+        REFERENCES TaiKhoanNguoiDung(MaTaiKhoan),
 
     CONSTRAINT CK_TinBao_NguonTin
         CHECK (NguonTin IN (N'NguoiDan', N'CanBo')),
@@ -143,7 +165,7 @@ GO
     LoaiTep NVARCHAR(20) NOT NULL,
     KichThuoc BIGINT NULL,
 
-    MaNguoiTaiLen INT NULL,
+    MaNguoiTaiLen BIGINT NULL,
     ThoiGianTaiLen DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
 
     CONSTRAINT FK_TepTinBao_TinBao
@@ -151,9 +173,9 @@ GO
         REFERENCES TinBao(MaTinBao)
         ON DELETE CASCADE,
 
-    CONSTRAINT FK_TepTinBao_NguoiDung
+    CONSTRAINT FK_TepTinBao_TaiKhoan
         FOREIGN KEY (MaNguoiTaiLen)
-        REFERENCES NguoiDung(MaNguoiDung),
+        REFERENCES TaiKhoanNguoiDung(MaTaiKhoan),
 
     CONSTRAINT CK_TepTinBao_LoaiTep
         CHECK (LoaiTep IN (N'Anh', N'Video', N'TaiLieu'))
@@ -414,6 +436,47 @@ CREATE TABLE BanGiao
 
     CONSTRAINT FK_BanGiao_NguoiGiao
         FOREIGN KEY (MaNguoiGiao) REFERENCES TaiKhoanNguoiDung(MaTaiKhoan)
+);
+GO
+
+CREATE TABLE HinhAnh
+(
+    MaHinhAnh BIGINT IDENTITY(1,1) PRIMARY KEY,
+    TenFile NVARCHAR(255) NOT NULL,
+    TenGoc NVARCHAR(255) NOT NULL,
+    DuongDan NVARCHAR(500) NOT NULL,
+    LoaiHinhAnh NVARCHAR(50) NOT NULL,
+    DinhDang VARCHAR(30) NOT NULL,
+    KichThuoc BIGINT NOT NULL,
+    ChieuRong INT NULL,
+    ChieuCao INT NULL,
+    HashMD5 VARCHAR(64) NULL,
+    LaNhayCam BIT NOT NULL DEFAULT 0,
+    MoTa NVARCHAR(500) NULL,
+
+    MaHoSoThiThe BIGINT NULL,
+    MaHoSoMatTich BIGINT NULL,
+    MaTinBao INT NULL,
+    MaXacMinh BIGINT NULL,
+
+    MaTaiKhoanTaiLen BIGINT NOT NULL,
+    ThoiGianTaiLen DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    TrangThai NVARCHAR(20) NOT NULL DEFAULT N'HoatDong',
+
+    CONSTRAINT FK_HinhAnh_HoSoThiThe
+        FOREIGN KEY (MaHoSoThiThe) REFERENCES HoSoThiThe(MaHoSoThiThe),
+
+    CONSTRAINT FK_HinhAnh_HoSoMatTich
+        FOREIGN KEY (MaHoSoMatTich) REFERENCES HoSoNguoiMatTich(MaHoSoMatTich),
+
+    CONSTRAINT FK_HinhAnh_TinBao
+        FOREIGN KEY (MaTinBao) REFERENCES TinBao(MaTinBao),
+
+    CONSTRAINT FK_HinhAnh_XacMinh
+        FOREIGN KEY (MaXacMinh) REFERENCES XacMinh(MaXacMinh),
+
+    CONSTRAINT FK_HinhAnh_TaiKhoan
+        FOREIGN KEY (MaTaiKhoanTaiLen) REFERENCES TaiKhoanNguoiDung(MaTaiKhoan)
 );
 GO
  

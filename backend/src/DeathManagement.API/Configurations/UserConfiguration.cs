@@ -1,5 +1,3 @@
-<<<<<<< Updated upstream
-=======
 using DeathManagement.API.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -18,4 +16,4 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .HasConstraintName("FK_TaiKhoan_VaiTro");
     }
 }
->>>>>>> Stashed changes
+

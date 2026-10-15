@@ -1,5 +1,3 @@
-<<<<<<< Updated upstream
-=======
 using DeathManagement.API.Data;
 using DeathManagement.API.DTOs.Auth;
 using DeathManagement.API.Security;
@@ -113,4 +111,3 @@ public class AuthService(ApplicationDbContext db) : IAuthService
         return db.Database.ExecuteSqlInterpolatedAsync($"EXEC sp_GhiNhatKy {hanhDong}, {doiTuong}, {maTaiKhoan}");
     }
 }
->>>>>>> Stashed changes
