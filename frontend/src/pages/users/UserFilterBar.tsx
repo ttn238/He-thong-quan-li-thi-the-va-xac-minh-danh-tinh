@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UserFilterParams } from '../../types/User';
+import { UserFilterParams, SYSTEM_ROLES } from '../../types/User';
 
 interface UserFilterBarProps {
   onFilterChange: (filters: UserFilterParams) => void;
@@ -46,7 +46,7 @@ export const UserFilterBar: React.FC<UserFilterBarProps> = ({ onFilterChange, is
           />
         </div>
 
-        {/* Lọc vai trò */}
+        {/* Lọc vai trò (5 nhóm quyền chuẩn hệ thống) */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Vai trò</label>
           <select
@@ -55,9 +55,11 @@ export const UserFilterBar: React.FC<UserFilterBarProps> = ({ onFilterChange, is
             onChange={(e) => setMaVaiTro(e.target.value ? Number(e.target.value) : undefined)}
           >
             <option value="">-- Tất cả vai trò --</option>
-            <option value="1">Quản trị viên (Admin)</option>
-            <option value="2">Cán bộ giám định</option>
-            <option value="3">Người dân</option>
+            {SYSTEM_ROLES.map((role) => (
+              <option key={role.id} value={role.id}>
+                {role.label} ({role.code})
+              </option>
+            ))}
           </select>
         </div>
 
@@ -82,7 +84,7 @@ export const UserFilterBar: React.FC<UserFilterBarProps> = ({ onFilterChange, is
           <input
             type="text"
             className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Phòng Kỹ thuật hình sự..."
+            placeholder="Công an Q1, Phòng Kỹ thuật hình sự..."
             value={donVi}
             onChange={(e) => setDonVi(e.target.value)}
           />

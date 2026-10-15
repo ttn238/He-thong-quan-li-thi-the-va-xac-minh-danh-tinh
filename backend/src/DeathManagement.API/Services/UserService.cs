@@ -1,18 +1,22 @@
 using DeathManagement.API.DTOs.User;
 using DeathManagement.API.Entities;
+using DeathManagement.API.Repositories;
 using DeathManagement.API.Repositories.Interfaces;
 using DeathManagement.API.Security;
 using DeathManagement.API.Services.Interfaces;
 
 namespace DeathManagement.API.Services;
 
+/// <summary>
+/// Dịch vụ nghiệp vụ quản lý tài khoản người dùng
+/// </summary>
 public class UserService : IUserService
 {
     private readonly IUserRepository _userRepository;
 
-    public UserService(IUserRepository userRepository)
+    public UserService(IUserRepository? userRepository = null)
     {
-        _userRepository = userRepository;
+        _userRepository = userRepository ?? new UserRepository();
     }
 
     public async Task<PagedResult<UserDto>> GetPagedListAsync(UserFilterRequest filter)
@@ -44,25 +48,27 @@ public class UserService : IUserService
 
     public async Task<UserDto> CreateAsync(CreateUserRequest request)
     {
+        var username = request.TenDangNhap.Trim();
+
         // Kiểm tra trùng lặp
-        if (await _userRepository.ExistsByUsernameAsync(request.TenDangNhap))
-            throw new InvalidOperationException($"Tên đăng nhập '{request.TenDangNhap}' đã được sử dụng.");
+        if (await _userRepository.ExistsByUsernameAsync(username))
+            throw new InvalidOperationException($"Tên đăng nhập '{username}' đã được sử dụng trong hệ thống.");
 
-        if (!string.IsNullOrWhiteSpace(request.Email) && await _userRepository.ExistsByEmailAsync(request.Email))
-            throw new InvalidOperationException($"Email '{request.Email}' đã được sử dụng.");
+        if (!string.IsNullOrWhiteSpace(request.Email) && await _userRepository.ExistsByEmailAsync(request.Email.Trim()))
+            throw new InvalidOperationException($"Email '{request.Email}' đã được liên kết với một tài khoản khác.");
 
-        if (!string.IsNullOrWhiteSpace(request.SoDienThoai) && await _userRepository.ExistsByPhoneAsync(request.SoDienThoai))
-            throw new InvalidOperationException($"Số điện thoại '{request.SoDienThoai}' đã được sử dụng.");
+        if (!string.IsNullOrWhiteSpace(request.SoDienThoai) && await _userRepository.ExistsByPhoneAsync(request.SoDienThoai.Trim()))
+            throw new InvalidOperationException($"Số điện thoại '{request.SoDienThoai}' đã được liên kết với một tài khoản khác.");
 
-        if (!string.IsNullOrWhiteSpace(request.CCCD) && await _userRepository.ExistsByCccdAsync(request.CCCD))
-            throw new InvalidOperationException($"Số CCCD '{request.CCCD}' đã được sử dụng.");
+        if (!string.IsNullOrWhiteSpace(request.CCCD) && await _userRepository.ExistsByCccdAsync(request.CCCD.Trim()))
+            throw new InvalidOperationException($"Số CCCD/Định danh '{request.CCCD}' đã được sử dụng bởi tài khoản khác.");
 
         // Băm mật khẩu bằng PBKDF2 chuẩn bảo mật
         string passwordHash = PasswordHasher.HashPassword(request.MatKhau);
 
         var newUser = new User
         {
-            TenDangNhap = request.TenDangNhap.Trim(),
+            TenDangNhap = username,
             MatKhauHash = passwordHash,
             HoTen = request.HoTen.Trim(),
             Email = request.Email?.Trim(),
@@ -87,13 +93,13 @@ public class UserService : IUserService
         if (existing == null) return null;
 
         // Kiểm tra trùng lặp email, sdt, cccd ngoại trừ chính user này
-        if (!string.IsNullOrWhiteSpace(request.Email) && await _userRepository.ExistsByEmailAsync(request.Email, id))
+        if (!string.IsNullOrWhiteSpace(request.Email) && await _userRepository.ExistsByEmailAsync(request.Email.Trim(), id))
             throw new InvalidOperationException($"Email '{request.Email}' đã được sử dụng bởi tài khoản khác.");
 
-        if (!string.IsNullOrWhiteSpace(request.SoDienThoai) && await _userRepository.ExistsByPhoneAsync(request.SoDienThoai, id))
+        if (!string.IsNullOrWhiteSpace(request.SoDienThoai) && await _userRepository.ExistsByPhoneAsync(request.SoDienThoai.Trim(), id))
             throw new InvalidOperationException($"Số điện thoại '{request.SoDienThoai}' đã được sử dụng bởi tài khoản khác.");
 
-        if (!string.IsNullOrWhiteSpace(request.CCCD) && await _userRepository.ExistsByCccdAsync(request.CCCD, id))
+        if (!string.IsNullOrWhiteSpace(request.CCCD) && await _userRepository.ExistsByCccdAsync(request.CCCD.Trim(), id))
             throw new InvalidOperationException($"Số CCCD '{request.CCCD}' đã được sử dụng bởi tài khoản khác.");
 
         existing.HoTen = request.HoTen.Trim();
@@ -114,10 +120,10 @@ public class UserService : IUserService
         var existing = await _userRepository.GetByIdAsync(currentUserId);
         if (existing == null) return null;
 
-        if (!string.IsNullOrWhiteSpace(request.Email) && await _userRepository.ExistsByEmailAsync(request.Email, currentUserId))
+        if (!string.IsNullOrWhiteSpace(request.Email) && await _userRepository.ExistsByEmailAsync(request.Email.Trim(), currentUserId))
             throw new InvalidOperationException($"Email '{request.Email}' đã được sử dụng bởi tài khoản khác.");
 
-        if (!string.IsNullOrWhiteSpace(request.SoDienThoai) && await _userRepository.ExistsByPhoneAsync(request.SoDienThoai, currentUserId))
+        if (!string.IsNullOrWhiteSpace(request.SoDienThoai) && await _userRepository.ExistsByPhoneAsync(request.SoDienThoai.Trim(), currentUserId))
             throw new InvalidOperationException($"Số điện thoại '{request.SoDienThoai}' đã được sử dụng bởi tài khoản khác.");
 
         existing.HoTen = request.HoTen.Trim();
@@ -132,7 +138,8 @@ public class UserService : IUserService
     public async Task<bool> ChangeStatusAsync(long adminId, long targetUserId, ChangeUserStatusRequest request)
     {
         // Chống quản trị viên tự khóa tài khoản của chính mình
-        if (adminId == targetUserId && string.Equals(request.TrangThai, "Khoa", StringComparison.OrdinalIgnoreCase))
+        if (adminId == targetUserId && (string.Equals(request.TrangThai, "Khoa", StringComparison.OrdinalIgnoreCase) ||
+                                       string.Equals(request.TrangThai, "KhoaTam", StringComparison.OrdinalIgnoreCase)))
         {
             throw new InvalidOperationException("Quản trị viên không thể tự khóa tài khoản của chính mình.");
         }
@@ -142,6 +149,11 @@ public class UserService : IUserService
 
     public async Task<bool> ResetPasswordAsync(long adminId, long targetUserId, ResetPasswordRequest request)
     {
+        if (string.IsNullOrWhiteSpace(request.MatKhauMoi) || request.MatKhauMoi.Length < 6)
+        {
+            throw new InvalidOperationException("Mật khẩu mới phải có độ dài tối thiểu 6 ký tự.");
+        }
+
         string newPasswordHash = PasswordHasher.HashPassword(request.MatKhauMoi);
         return await _userRepository.UpdatePasswordAsync(targetUserId, newPasswordHash);
     }
@@ -158,12 +170,26 @@ public class UserService : IUserService
 
     private static UserDto MapToDto(User user)
     {
-        string tenVaiTro = user.MaVaiTro switch
+        string tenVaiTro = !string.IsNullOrEmpty(user.Role?.TenVaiTro)
+            ? user.Role.TenVaiTro
+            : user.MaVaiTro switch
+            {
+                1 => "Quản trị hệ thống",
+                2 => "Công an / cán bộ xác minh",
+                3 => "Công an có thẩm quyền duyệt",
+                4 => "Nhân viên nhà xác",
+                5 => "Người dân / người thân",
+                _ => "Không xác định"
+            };
+
+        string maCodeVaiTro = user.Role?.Code ?? user.MaVaiTro switch
         {
-            1 => "QuanTriVien",
-            2 => "CanBoGiamDinh",
-            3 => "NguoiDan",
-            _ => "KhongXacDinh"
+            1 => "ADMIN",
+            2 => "CONG_AN",
+            3 => "CONG_AN_DUYET",
+            4 => "NHA_XAC",
+            5 => "NGUOI_DAN",
+            _ => "OTHER"
         };
 
         return new UserDto
@@ -178,6 +204,7 @@ public class UserService : IUserService
             ChucVu = user.ChucVu,
             MaVaiTro = user.MaVaiTro,
             TenVaiTro = tenVaiTro,
+            MaCodeVaiTro = maCodeVaiTro,
             TrangThai = user.TrangThai,
             SoLanDangNhapSai = user.SoLanDangNhapSai,
             KhoaDenThoiDiem = user.KhoaDenThoiDiem,
