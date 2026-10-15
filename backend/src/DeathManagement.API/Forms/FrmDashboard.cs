@@ -1,4 +1,5 @@
 using System.Drawing.Drawing2D;
+using DeathManagement.API.Common;
 using DeathManagement.API.Data;
 using DeathManagement.API.Security;
 using Microsoft.EntityFrameworkCore;
@@ -152,6 +153,10 @@ public class FrmDashboard : Form
             string.Equals(tk.TenDangNhap, "admin", StringComparison.OrdinalIgnoreCase));
         mnuQuanTri.Visible = laAdmin;
 
+        var isCitizen = tk != null && (
+            tk.TenVaiTro.Contains("Người dân", StringComparison.OrdinalIgnoreCase) ||
+            tk.TenVaiTro.Contains("NGUOI_DAN", StringComparison.OrdinalIgnoreCase));
+
         var mnuNghiepVu = new ToolStripMenuItem("📋 QUẢN LÝ HỒ SƠ");
         mnuNghiepVu.DropDownItems.Add(new ToolStripMenuItem("Tiếp nhận tin báo sự việc...", null, (s, e) =>
         {
@@ -176,15 +181,20 @@ public class FrmDashboard : Form
         // 3. Main Dashboard Body
         var pnlMainBody = new Panel { Dock = DockStyle.Fill, Padding = new Padding(25), BackColor = UITheme.Bg };
 
-        // Quick Stats Cards Panel
-        var pnlCards = new Panel { Dock = DockStyle.Top, Height = 110, BackColor = Color.Transparent };
-        int cardWidth = 260;
-        int gap = 20;
+        // Thống kê tài khoản & vai trò - CHỈ HIỂN THỊ CHO QUẢN TRỊ VIÊN HỆ THỐNG (ADMIN)
+        // Cán bộ nghiệp vụ và Người dân không hiển thị mục quản trị tài khoản này
+        Panel? pnlCards = null;
+        if (laAdmin)
+        {
+            pnlCards = new Panel { Dock = DockStyle.Top, Height = 110, BackColor = Color.Transparent };
+            int cardWidth = 260;
+            int gap = 20;
 
-        pnlCards.Controls.Add(CreateStatCard("TỔNG TÀI KHOẢN", lblTongUser, "Toàn hệ thống", UITheme.Navy, 0 * (cardWidth + gap)));
-        pnlCards.Controls.Add(CreateStatCard("ĐANG HOẠT ĐỘNG", lblUserHoatDong, "Được phép đăng nhập", UITheme.Green, 1 * (cardWidth + gap)));
-        pnlCards.Controls.Add(CreateStatCard("ĐANG BỊ KHÓA", lblUserKhoa, "Khóa tạm / vô hiệu hóa", UITheme.Red, 2 * (cardWidth + gap)));
-        pnlCards.Controls.Add(CreateStatCard("DANH MỤC VAI TRÒ", lblTongRole, "Cấu hình phân quyền", UITheme.Blue, 3 * (cardWidth + gap)));
+            pnlCards.Controls.Add(CreateStatCard("TỔNG TÀI KHOẢN", lblTongUser, "Toàn hệ thống", UITheme.Navy, 0 * (cardWidth + gap)));
+            pnlCards.Controls.Add(CreateStatCard("ĐANG HOẠT ĐỘNG", lblUserHoatDong, "Được phép đăng nhập", UITheme.Green, 1 * (cardWidth + gap)));
+            pnlCards.Controls.Add(CreateStatCard("ĐANG BỊ KHÓA", lblUserKhoa, "Khóa tạm / vô hiệu hóa", UITheme.Red, 2 * (cardWidth + gap)));
+            pnlCards.Controls.Add(CreateStatCard("DANH MỤC VAI TRÒ", lblTongRole, "Cấu hình phân quyền", UITheme.Blue, 3 * (cardWidth + gap)));
+        }
 
         // Action Center Panel
         var pnlActionCenter = new Panel
@@ -239,21 +249,34 @@ public class FrmDashboard : Form
             f.ShowDialog(this);
         }));
 
-        pnlButtons.Controls.Add(CreateQuickActionButton("📁 Tiếp nhận hồ sơ tử thi (Body)", ColorTranslator.FromHtml("#34495e"), () =>
+        pnlButtons.Controls.Add(CreateQuickActionButton(isCitizen ? "📝 Khai báo tin báo sự việc / mất tích" : "📋 Tiếp nhận tin báo sự việc", ColorTranslator.FromHtml("#0984e3"), () =>
         {
-            MessageBox.Show("Chức năng Tiếp nhận tử thi đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            using var f = new FrmTiepNhanTinBao();
+            f.ShowDialog(this);
         }));
 
-        pnlButtons.Controls.Add(CreateQuickActionButton("🔍 Đối chiếu danh tính (AI Matching)", ColorTranslator.FromHtml("#27ae60"), () =>
+        // Chức năng nghiệp vụ tử thi và AI chỉ hiển thị cho cán bộ / admin, không dành cho người dân
+        if (!isCitizen)
         {
-            MessageBox.Show("Chức năng Đối chiếu danh tính AI đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }));
+            pnlButtons.Controls.Add(CreateQuickActionButton("📁 Tiếp nhận hồ sơ tử thi (Body)", ColorTranslator.FromHtml("#34495e"), () =>
+            {
+                MessageBox.Show("Chức năng Tiếp nhận tử thi đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }));
+
+            pnlButtons.Controls.Add(CreateQuickActionButton("🔍 Đối chiếu danh tính (AI Matching)", ColorTranslator.FromHtml("#27ae60"), () =>
+            {
+                MessageBox.Show("Chức năng Đối chiếu danh tính AI đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }));
+        }
 
         pnlActionCenter.Controls.Add(lblActionTitle);
         pnlActionCenter.Controls.Add(pnlButtons);
 
         pnlMainBody.Controls.Add(pnlActionCenter);
-        pnlMainBody.Controls.Add(pnlCards);
+        if (pnlCards != null)
+        {
+            pnlMainBody.Controls.Add(pnlCards);
+        }
 
         // Add All
         Controls.Add(pnlMainBody);
@@ -335,6 +358,15 @@ public class FrmDashboard : Form
 
     private void LoadThongKe()
     {
+        var tk = Session.TaiKhoan;
+        var laAdmin = tk != null && (
+            tk.TenVaiTro.Contains("Quản trị", StringComparison.OrdinalIgnoreCase) ||
+            tk.TenVaiTro.Contains("ADMIN", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(tk.TenDangNhap, "admin", StringComparison.OrdinalIgnoreCase));
+
+        // Không cần nạp thống kê tài khoản nếu không phải Quản trị viên
+        if (!laAdmin) return;
+
         try
         {
             using var db = Program.NewDb();
