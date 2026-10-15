@@ -1,5 +1,7 @@
 using DeathManagement.API.Entities;
 using Microsoft.EntityFrameworkCore;
+using DeathManagement.API.Entities;
+using Microsoft.EntityFrameworkCore;
 using Image = DeathManagement.API.Entities.Image;
 
 namespace DeathManagement.API.Data;

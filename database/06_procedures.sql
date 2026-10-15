@@ -26,7 +26,7 @@ GO
 
 -- Cong an xu ly tin bao: DaTiepNhan / TuChoi / YeuCauBoSung / DangXacMinh / DaXuLy
 CREATE OR ALTER PROCEDURE sp_XuLyTinBao
-    @MaTinBao BIGINT, @MaTaiKhoan BIGINT, @QuyetDinh NVARCHAR(30)
+    @MaTinBao INT, @MaTaiKhoan BIGINT, @QuyetDinh NVARCHAR(30)
 AS
 BEGIN
     SET NOCOUNT ON; SET XACT_ABORT ON;
@@ -50,7 +50,7 @@ GO
 CREATE OR ALTER PROCEDURE sp_LapHoSoThiThe
     @MaTaiKhoan BIGINT, @ThoiGianPhatHien DATETIME2, @DiaDiem NVARCHAR(255),
     @GioiTinh NVARCHAR(10), @TuoiUocLuong SMALLINT = NULL, @ChieuCao DECIMAL(5,2) = NULL,
-    @DacDiemCoThe NVARCHAR(MAX) = NULL, @MaTinBao BIGINT = NULL,
+    @DacDiemCoThe NVARCHAR(MAX) = NULL, @MaTinBao INT = NULL,
     @MaHoSoThiThe BIGINT OUTPUT
 AS
 BEGIN
@@ -679,4 +679,4 @@ BEGIN
     INSERT INTO NhatKyHeThong (HanhDong, DoiTuongTacDong, MaTaiKhoan)
     VALUES (CONCAT(N'XOA_HINH_ANH#', @MaHinhAnh), CONCAT(N'HinhAnh#', @MaHinhAnh), @MaTaiKhoan);
 END
-GO
+GO 

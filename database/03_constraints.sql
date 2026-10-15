@@ -24,12 +24,6 @@ ALTER TABLE TaiKhoanNguoiDung ADD
                OR (SoDienThoai NOT LIKE '%[^0-9+]%' AND LEN(SoDienThoai) BETWEEN 9 AND 12));
 GO
 
-/* 4. Tin bao */
-ALTER TABLE TinBao DROP CONSTRAINT IF EXISTS CK_TinBao_TrangThai;
-ALTER TABLE TinBao ADD CONSTRAINT CK_TinBao_TrangThai
-    CHECK (TrangThai IN (N'MoiTiepNhan', N'DaTiepNhan', N'YeuCauBoSung', N'TuChoi', N'DangXacMinh', N'DaXuLy'));
-GO
-
 /* 5. Ho so thi the */
 ALTER TABLE HoSoThiThe DROP CONSTRAINT IF EXISTS CK_HoSoThiThe_TrangThai;
 ALTER TABLE HoSoThiThe ADD CONSTRAINT CK_HoSoThiThe_TrangThai

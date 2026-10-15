@@ -113,7 +113,7 @@ public class FrmLogin : Form
         try
         {
             using var db = Program.NewDb();
-            var (ket, tk) = await new AuthService(db).DangNhapAsync(user, txtPass.Text);
+            var (ket, tk, thongBao) = await new AuthService(db).DangNhapAsync(user, txtPass.Text);
 
             if (ket == KetQuaDangNhap.ThanhCong)
             {
@@ -124,12 +124,15 @@ public class FrmLogin : Form
             }
             else if (ket == KetQuaDangNhap.TaiKhoanKhoa)
                 HienLoi("Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên để được mở khóa.");
+            else if (ket == KetQuaDangNhap.TamKhoa)
+                HienLoi(thongBao ?? "Tài khoản đang bị khóa tạm thời.");
             else
                 HienLoi("Sai tên đăng nhập hoặc mật khẩu.");
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine(ex);    // xem chi tiết lỗi ở cửa sổ Output của Visual Studio
+            HienLoi("Không kết nối được cơ sở dữ liệu.");
             var msg = ex.InnerException?.Message ?? ex.Message;
             HienLoi($"Lỗi kết nối / dữ liệu: {msg}");
         }
