@@ -131,7 +131,11 @@ public class FrmDashboard : Form
         mnuQuanTri.Visible = laAdmin;
 
         var mnuNghiepVu = new ToolStripMenuItem("📋 QUẢN LÝ HỒ SƠ");
-        mnuNghiepVu.DropDownItems.Add(new ToolStripMenuItem("Tiếp nhận hồ sơ thi thể chưa xác định..."));
+        mnuNghiepVu.DropDownItems.Add(new ToolStripMenuItem("Tiếp nhận tin báo sự việc...", null, (s, e) =>
+        {
+            using var f = new FrmTiepNhanTinBao();
+            f.ShowDialog(this);
+        }));
         mnuNghiepVu.DropDownItems.Add(new ToolStripMenuItem("Hồ sơ người mất tích..."));
         mnuNghiepVu.DropDownItems.Add(new ToolStripMenuItem("Đối chiếu & Xác minh danh tính..."));
 
