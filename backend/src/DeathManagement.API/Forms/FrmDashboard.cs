@@ -2,6 +2,7 @@ using System.Drawing.Drawing2D;
 using DeathManagement.API.Data;
 using DeathManagement.API.Security;
 using Microsoft.EntityFrameworkCore;
+using static DeathManagement.API.Security.AuthorizationPolicies;
 
 namespace DeathManagement.API.Forms;
 
@@ -139,33 +140,38 @@ public class FrmDashboard : Form
         var mnuQuanTri = new ToolStripMenuItem("👥 QUẢN TRỊ NGƯỜI DÙNG & VAI TRÒ");
         var mnuUsers = new ToolStripMenuItem("Danh sách tài khoản & Phân quyền Role...", null, (s, e) =>
         {
+            if (!PermissionUi.Check(this, ResourceAccount, ActionView)) return;   // <-- THÊM DÒNG NÀY
             using var f = new FrmQuanLyNguoiDung();
             f.ShowDialog(this);
             LoadThongKe();
         });
         mnuQuanTri.DropDownItems.Add(mnuUsers);
 
-        // Kiểm tra phân quyền: Chỉ ADMIN mới thấy menu Quản trị
-        var laAdmin = tk != null && (
-            tk.TenVaiTro.Contains("Quản trị", StringComparison.OrdinalIgnoreCase) ||
-            tk.TenVaiTro.Contains("ADMIN", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(tk.TenDangNhap, "admin", StringComparison.OrdinalIgnoreCase));
+        // Ẩn/hiện theo quyền (chỉ là gợi ý giao diện; backend vẫn kiểm tra lại khi thao tác)
+        var laAdmin = AccessControl.Can(ResourceAccount, ActionView);
         mnuQuanTri.Visible = laAdmin;
 
         var mnuNghiepVu = new ToolStripMenuItem("📋 QUẢN LÝ HỒ SƠ");
-        mnuNghiepVu.DropDownItems.Add(new ToolStripMenuItem("Tiếp nhận tin báo sự việc...", null, (s, e) =>
+        var mnuTinBao = new ToolStripMenuItem("Tiếp nhận tin báo sự việc...", null, (s, e) =>
         {
+            if (!PermissionUi.Check(this, ResourceIncident, ActionCreate)) return;
             using var f = new FrmTiepNhanTinBao();
             f.ShowDialog(this);
-        }));
-        mnuNghiepVu.DropDownItems.Add(new ToolStripMenuItem("Hồ sơ người mất tích..."));
-        mnuNghiepVu.DropDownItems.Add(new ToolStripMenuItem("Đối chiếu & Xác minh danh tính..."));
+        })
+        { Visible = AccessControl.Can(ResourceIncident, ActionCreate) };
+        mnuNghiepVu.DropDownItems.Add(mnuTinBao);
+        mnuNghiepVu.DropDownItems.Add(new ToolStripMenuItem("Hồ sơ người mất tích...")
+        { Visible = AccessControl.Can(ResourceMissingPerson, ActionView) });
+        mnuNghiepVu.DropDownItems.Add(new ToolStripMenuItem("Đối chiếu & Xác minh danh tính...")
+        { Visible = AccessControl.Can(ResourceMatching, ActionView) });
         mnuNghiepVu.DropDownItems.Add(new ToolStripSeparator());
         var mnuKhoAnh = new ToolStripMenuItem("🖼️ Kho hình ảnh & Tệp đính kèm...", null, (s, e) =>
         {
+            if (!PermissionUi.Check(this, ResourceFile, ActionView)) return;
             using var f = new FrmQuanLyHinhAnh();
             f.ShowDialog(this);
-        });
+        })
+        { Visible = AccessControl.Can(ResourceFile, ActionView) };
         mnuNghiepVu.DropDownItems.Add(mnuKhoAnh);
 
         var mnuTroGiup = new ToolStripMenuItem("ℹ TRỢ GIÚP");
@@ -185,7 +191,7 @@ public class FrmDashboard : Form
         pnlCards.Controls.Add(CreateStatCard("ĐANG HOẠT ĐỘNG", lblUserHoatDong, "Được phép đăng nhập", UITheme.Green, 1 * (cardWidth + gap)));
         pnlCards.Controls.Add(CreateStatCard("ĐANG BỊ KHÓA", lblUserKhoa, "Khóa tạm / vô hiệu hóa", UITheme.Red, 2 * (cardWidth + gap)));
         pnlCards.Controls.Add(CreateStatCard("DANH MỤC VAI TRÒ", lblTongRole, "Cấu hình phân quyền", UITheme.Blue, 3 * (cardWidth + gap)));
-
+        pnlCards.Visible = laAdmin;   // thống kê tài khoản chỉ dành cho người có quyền ACCOUNT:VIEW
         // Action Center Panel
         var pnlActionCenter = new Panel
         {
@@ -219,35 +225,48 @@ public class FrmDashboard : Form
 
         if (laAdmin)
         {
-            pnlButtons.Controls.Add(CreateQuickActionButton("👥 Quản lý tài khoản & Phân quyền", UITheme.Navy, () =>
+            pnlButtons.Controls.Add(CreateQuickActionButton("Quản lý tài khoản & Phân quyền", UITheme.Navy, () =>
             {
+                if (!PermissionUi.Check(this, ResourceAccount, ActionView)) return;
                 using var f = new FrmQuanLyNguoiDung();
                 f.ShowDialog(this);
                 LoadThongKe();
             }));
         }
 
-        pnlButtons.Controls.Add(CreateQuickActionButton("🖼️ Quản lý kho hình ảnh & tệp đính kèm", ColorTranslator.FromHtml("#6c5ce7"), () =>
+        if (AccessControl.Can(ResourceFile, ActionView))
         {
-            using var f = new FrmQuanLyHinhAnh();
+            pnlButtons.Controls.Add(CreateQuickActionButton("Quản lý kho hình ảnh & tệp đính kèm", ColorTranslator.FromHtml("#6c5ce7"), () =>
+            {
+                if (!PermissionUi.Check(this, ResourceFile, ActionView)) return;
+                using var f = new FrmQuanLyHinhAnh();
+                f.ShowDialog(this);
+            }));
+        }
+
+        pnlButtons.Controls.Add(CreateQuickActionButton("Thay đổi mật khẩu cá nhân", UITheme.Blue, () =>
+        {
+            using var f = new FrmDoiMatKhau();   // tự phục vụ: mọi vai trò đều được đổi mật khẩu của chính mình
             f.ShowDialog(this);
         }));
 
-        pnlButtons.Controls.Add(CreateQuickActionButton("🔑 Thay đổi mật khẩu cá nhân", UITheme.Blue, () =>
+        if (AccessControl.Can(ResourceBody, ActionCreate))
         {
-            using var f = new FrmDoiMatKhau();
-            f.ShowDialog(this);
-        }));
+            pnlButtons.Controls.Add(CreateQuickActionButton("Tiếp nhận hồ sơ tử thi (Body)", ColorTranslator.FromHtml("#34495e"), () =>
+            {
+                if (!PermissionUi.Check(this, ResourceBody, ActionCreate)) return;
+                MessageBox.Show("Chức năng Tiếp nhận tử thi đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }));
+        }
 
-        pnlButtons.Controls.Add(CreateQuickActionButton("📁 Tiếp nhận hồ sơ tử thi (Body)", ColorTranslator.FromHtml("#34495e"), () =>
+        if (AccessControl.Can(ResourceMatching, ActionView))
         {
-            MessageBox.Show("Chức năng Tiếp nhận tử thi đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }));
-
-        pnlButtons.Controls.Add(CreateQuickActionButton("🔍 Đối chiếu danh tính (AI Matching)", ColorTranslator.FromHtml("#27ae60"), () =>
-        {
-            MessageBox.Show("Chức năng Đối chiếu danh tính AI đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }));
+            pnlButtons.Controls.Add(CreateQuickActionButton("Đối chiếu danh tính (AI Matching)", ColorTranslator.FromHtml("#27ae60"), () =>
+            {
+                if (!PermissionUi.Check(this, ResourceMatching, ActionView)) return;
+                MessageBox.Show("Chức năng Đối chiếu danh tính AI đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }));
+        }
 
         pnlActionCenter.Controls.Add(lblActionTitle);
         pnlActionCenter.Controls.Add(pnlButtons);
@@ -335,6 +354,12 @@ public class FrmDashboard : Form
 
     private void LoadThongKe()
     {
+        if (!AccessControl.Can(ResourceAccount, ActionView))
+        {
+            lblTongUser.Text = lblUserHoatDong.Text = lblUserKhoa.Text = lblTongRole.Text = "-";
+            return;
+        }
+
         try
         {
             using var db = Program.NewDb();
