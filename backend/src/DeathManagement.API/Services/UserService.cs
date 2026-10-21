@@ -178,7 +178,6 @@ public class UserService : IUserService
 
     private static UserDto MapToDto(User user)
     {
-<<<<<<< HEAD
         string tenVaiTro = !string.IsNullOrEmpty(user.Role?.TenVaiTro)
             ? user.Role.TenVaiTro
             : user.MaVaiTro switch
@@ -200,9 +199,8 @@ public class UserService : IUserService
             5 => "NGUOI_DAN",
             _ => "OTHER"
         };
-=======
+
         string tenVaiTro = user.Role?.TenVaiTro ?? "KhongXacDinh";
->>>>>>> origin
 
         return new UserDto
         {

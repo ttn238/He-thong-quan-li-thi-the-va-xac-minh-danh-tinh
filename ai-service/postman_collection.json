@@ -1,0 +1,13 @@
+{
+  "info": {"name": "AI Service", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+  "variable": [{"key": "baseUrl", "value": "http://localhost:8000"}],
+  "item": [
+    {"name": "Health", "request": {"method": "GET", "url": "{{baseUrl}}/health"}},
+    {"name": "OCR license plate (upload)", "request": {"method": "POST", "url": "{{baseUrl}}/api/v1/ocr/license-plate",
+      "body": {"mode": "formdata", "formdata": [{"key": "file", "type": "file", "src": []}]}}},
+    {"name": "OCR license plate (image_path)", "request": {"method": "POST", "url": "{{baseUrl}}/api/v1/ocr/license-plate",
+      "body": {"mode": "formdata", "formdata": [{"key": "image_path", "type": "text", "value": "plate1.jpg"}]}}},
+    {"name": "Image analyze (upload)", "request": {"method": "POST", "url": "{{baseUrl}}/api/v1/image/analyze",
+      "body": {"mode": "formdata", "formdata": [{"key": "file", "type": "file", "src": []}]}}}
+  ]
+}
