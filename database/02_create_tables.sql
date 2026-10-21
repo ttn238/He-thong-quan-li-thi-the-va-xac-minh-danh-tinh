@@ -1,5 +1,8 @@
 USE QL_XACMINHTHITHE;
 GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
  
 CREATE TABLE VaiTro
 (
@@ -148,7 +151,7 @@ CREATE TABLE TinBao (
         CHECK (MucDoUuTien IN (N'Thap', N'BinhThuong', N'Cao', N'KhanCap')),
 
     CONSTRAINT CK_TinBao_TrangThai
-        CHECK (TrangThai IN (N'MoiTiepNhan', N'DangXuLy', N'DaChuyenXuLy', N'DaHoanThanh', N'DaHuy'))
+        CHECK (TrangThai IN (N'MoiTiepNhan', N'DaTiepNhan', N'YeuCauBoSung', N'TuChoi', N'DangXacMinh', N'DaXuLy'))
 );
 GO
  
@@ -190,10 +193,10 @@ CREATE TABLE HoSoThiThe
     ChieuCao DECIMAL(5,2),                -- don vi: cm
     DacDiemCoThe NVARCHAR(MAX),
     KhuonMat VARBINARY(MAX),              -- vector dac trung khuon mat
-    MaTin BIGINT NULL,
+    MaTinBao INT NULL,
 
     CONSTRAINT FK_HoSoThiThe_TinBao
-        FOREIGN KEY (MaTin) REFERENCES TinBao(MaTin),
+        FOREIGN KEY (MaTinBao) REFERENCES TinBao(MaTinBao),
 
     CONSTRAINT CK_HoSoThiThe_GioiTinh
         CHECK (GioiTinh IS NULL OR GioiTinh IN (N'Nam', N'Nu', N'Khac', N'KhongXacDinh')),
@@ -502,3 +505,4 @@ CREATE TABLE ThongBao
         FOREIGN KEY (MaTaiKhoan) REFERENCES TaiKhoanNguoiDung(MaTaiKhoan)
 );
 GO
+ 

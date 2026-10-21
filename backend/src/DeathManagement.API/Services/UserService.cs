@@ -3,6 +3,7 @@ using DeathManagement.API.Entities;
 using DeathManagement.API.Repositories.Interfaces;
 using DeathManagement.API.Security;
 using DeathManagement.API.Services.Interfaces;
+using static DeathManagement.API.Security.AuthorizationPolicies;
 
 namespace DeathManagement.API.Services;
 
@@ -107,6 +108,13 @@ public class UserService : IUserService
 
         var updated = await _userRepository.UpdateAsync(existing);
         return MapToDto(updated);
+
+        if (existing.MaVaiTro != request.MaVaiTro)
+        {
+            AccessControl.Require(ResourcePermission, ActionUpdate);   // đổi vai trò = phân quyền
+            if (AccessControl.UserId == id)
+                throw new InvalidOperationException("Không được tự thay đổi vai trò của chính mình.");
+        }
     }
 
     public async Task<UserDto?> UpdateProfileAsync(long currentUserId, UpdateProfileRequest request)
@@ -158,13 +166,7 @@ public class UserService : IUserService
 
     private static UserDto MapToDto(User user)
     {
-        string tenVaiTro = user.MaVaiTro switch
-        {
-            1 => "QuanTriVien",
-            2 => "CanBoGiamDinh",
-            3 => "NguoiDan",
-            _ => "KhongXacDinh"
-        };
+        string tenVaiTro = user.Role?.TenVaiTro ?? "KhongXacDinh";
 
         return new UserDto
         {
@@ -186,4 +188,14 @@ public class UserService : IUserService
             NgayCapNhat = user.NgayCapNhat
         };
     }
+
+    // GetPagedListAsync:           AccessControl.Require(ResourceAccount, ActionView);
+    // GetByIdAsync(long id):       AccessControl.RequireSelfOr(id, ResourceAccount, ActionView);   // xem hồ sơ của chính mình thì được
+    // GetByUsernameAsync:          AccessControl.Require(ResourceAccount, ActionView);
+    // CreateAsync:                 AccessControl.Require(ResourceAccount, ActionCreate);
+    // UpdateAsync(long id, ...):   AccessControl.Require(ResourceAccount, ActionUpdate);
+    // UpdateProfileAsync:          AccessControl.RequireSelfOr(currentUserId, ResourceAccount, ActionUpdate);
+    // ChangeStatusAsync:           AccessControl.Require(ResourceAccount, ActionUpdate);
+    // ResetPasswordAsync:          AccessControl.Require(ResourceAccount, ActionUpdate);
+    // DeleteAsync:                 AccessControl.Require(ResourceAccount, ActionUpdate);
 }
