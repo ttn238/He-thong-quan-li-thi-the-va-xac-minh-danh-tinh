@@ -293,7 +293,7 @@ public class FrmTaiLenHinhAnh : Form
                 LaNhayCam = chkNhayCam.Checked,
                 MaHoSoThiThe = maThiThe,
                 MaHoSoMatTich = maMatTich,
-                MaTaiKhoanTaiLen = Session.TaiKhoan?.MaTaiKhoan ?? 1
+                MaTaiKhoanTaiLen = 0   // ImageService tự gán từ JWT của người đăng nhập
             };
 
             var progress = new Progress<int>(pct =>

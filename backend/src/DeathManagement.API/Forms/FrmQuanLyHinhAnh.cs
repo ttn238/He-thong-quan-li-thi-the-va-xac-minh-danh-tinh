@@ -73,10 +73,9 @@ public class FrmQuanLyHinhAnh : Form
         Font = UITheme.FontRegular(9.5f);
 
         // Quyền cán bộ / Admin / Nhà xác: mặc định cho phép trừ khi là vai trò NGUOI_DAN
-        var role = Session.TaiKhoan?.TenVaiTro ?? "";
-        _coQuyenXemNhayCam = string.IsNullOrEmpty(role) ||
-            (!role.Contains("Người dân", StringComparison.OrdinalIgnoreCase) &&
-             !role.Contains("NGUOI_DAN", StringComparison.OrdinalIgnoreCase));
+        AccessControl.Require(AuthorizationPolicies.ResourceFile, AuthorizationPolicies.ActionView);
+        // Chỉ để ẩn/hiện bộ lọc; ImageService tự kiểm tra lại quyền xem ảnh nhạy cảm từ token
+        _coQuyenXemNhayCam = AccessControl.CanPolicy(AuthorizationPolicies.RequireSensitiveDataViewer);
 
         InitControls();
         BuildUI();
@@ -126,6 +125,7 @@ public class FrmQuanLyHinhAnh : Form
 
         btnTaiAnhMoi.Click += (s, e) =>
         {
+            if (!PermissionUi.Check(this, AuthorizationPolicies.ResourceFile, AuthorizationPolicies.ActionCreate)) return;   // <-- THÊM
             using var f = new FrmTaiLenHinhAnh();
             if (f.ShowDialog(this) == DialogResult.OK)
             {
@@ -521,7 +521,7 @@ public class FrmQuanLyHinhAnh : Form
         {
             using var db = Program.NewDb();
             var service = new ImageService(db);
-            var ok = await service.XoaHinhAnhAsync(img.MaHinhAnh, Session.TaiKhoan?.MaTaiKhoan ?? 1);
+            var ok = await service.XoaHinhAnhAsync(img.MaHinhAnh, AccessControl.UserId ?? 0);
             if (ok)
             {
                 MessageBox.Show("Đã xóa hình ảnh thành công.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
