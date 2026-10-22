@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using DeathManagement.API.Helpers;
 using DeathManagement.API.Data;
 using DeathManagement.API.DTOs.Image;
 using DeathManagement.API.Entities;
@@ -151,18 +152,39 @@ public class ImageService(ApplicationDbContext db) : IImageService
         AccessControl.Require(AuthorizationPolicies.ResourceFile, AuthorizationPolicies.ActionCreate);
         req.MaTaiKhoanTaiLen = AccessControl.UserId!.Value;   // luôn lấy từ token, bỏ qua giá trị UI gửi lên
 
-        if (!File.Exists(req.FilePath))
-            throw new FileNotFoundException("Tệp nguồn không tồn tại.", req.FilePath);
 
-        var fi = new FileInfo(req.FilePath);
-        var ext = fi.Extension.ToLowerInvariant();
-        var mime = ext switch
+        if (!File.Exists(req.FilePath))
         {
-            ".png" => "image/png",
-            ".webp" => "image/webp",
-            ".bmp" => "image/bmp",
-            _ => "image/jpeg"
-        };
+            throw new FileNotFoundException(
+                "Không tìm thấy tệp ảnh được chọn.");
+        }
+
+        // Chuẩn hóa đường dẫn và kiểm tra phần mở rộng.
+        var duongDanNguon = Path.GetFullPath(req.FilePath);
+
+        if (!FileHelper.IsValidImageExtension(duongDanNguon))
+        {
+            throw new InvalidOperationException(
+                "Chỉ chấp nhận ảnh JPG, JPEG, PNG hoặc BMP.");
+        }
+
+        var fi = new FileInfo(duongDanNguon);
+
+        // Kiểm tra dung lượng ngay tại tầng xử lý nghiệp vụ.
+        if (!FileHelper.IsValidFileSize(fi.Length))
+        {
+            throw new InvalidOperationException(
+                "Ảnh phải có dung lượng lớn hơn 0 và không vượt quá 10 MB.");
+        }
+
+        // Kiểm tra nội dung thật, tránh đổi tên file .exe hoặc file văn bản thành .jpg.
+        if (!FileHelper.IsValidImageContent(duongDanNguon))
+        {
+            throw new InvalidOperationException(
+                "Tệp không phải ảnh hợp lệ hoặc ảnh bị hỏng.");
+        }
+        var ext = fi.Extension.ToLowerInvariant();
+        var mime = ImageHelper.GetMimeType(fi.Name);
 
         // Quy tắc NFR1.2: Ảnh tử thi hoặc loại ThiThe_* bắt buộc gán cờ LaNhayCam = true
         var laNhayCam = req.LaNhayCam || req.MaHoSoThiThe.HasValue || req.LoaiHinhAnh.StartsWith("ThiThe_");
@@ -176,7 +198,7 @@ public class ImageService(ApplicationDbContext db) : IImageService
         var relativePath = $"/{subFolder}/{fileGuid}";
 
         // Async I/O copy file có báo cáo tiến trình (Chương 5 Đồ án)
-        await using (var sourceStream = new FileStream(req.FilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true))
+        await using (var sourceStream = new FileStream(duongDanNguon, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true))
         await using (var destStream = new FileStream(destFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
         {
             var buffer = new byte[81920];
@@ -239,7 +261,33 @@ public class ImageService(ApplicationDbContext db) : IImageService
         };
 
         db.Images.Add(entity);
-        await db.SaveChangesAsync();
+
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            // Lấy lỗi chi tiết từ SQL Server / Entity Framework
+            string loiChiTiet = ex.ToString();
+
+            try
+            {
+                if (File.Exists(destFilePath))
+                    File.Delete(destFilePath);
+            }
+            catch
+            {
+                // Không che mất lỗi gốc.
+            }
+
+            System.Diagnostics.Debug.WriteLine(loiChiTiet);
+
+            throw new InvalidOperationException(
+                "Lỗi lưu thông tin ảnh vào database:\n" + loiChiTiet,
+                ex);
+        }
+
 
         // Ghi Audit Log qua thủ tục sp_GhiNhatKy
         try

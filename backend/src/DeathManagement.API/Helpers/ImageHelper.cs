@@ -30,18 +30,21 @@ public static class ImageHelper
         };
     }
 
+
     /// <summary>
-    /// Chuẩn hóa MIME type từ extension
+    /// Lấy MIME type từ phần mở rộng đã được kiểm tra.
     /// </summary>
     public static string GetMimeType(string fileName)
     {
         var ext = Path.GetExtension(fileName).ToLowerInvariant();
+
         return ext switch
         {
             ".jpg" or ".jpeg" => "image/jpeg",
             ".png" => "image/png",
-            ".webp" => "image/webp",
-            _ => "application/octet-stream"
+            ".bmp" => "image/bmp",
+            _ => throw new InvalidOperationException(
+                "Định dạng ảnh không được hỗ trợ.")
         };
     }
 }
