@@ -30,6 +30,15 @@ public static class ImageHelper
         };
     }
 
+    public const int MaxAnhMoiTinBao = 5;
+    public const int MaxAnhMoiHoSoMatTich = 6;
+
+    public static readonly HashSet<string> LoaiHopLe = new()
+    {
+        TypeBodyExamination, TypeBodyFace, TypeBodyFull,
+        TypeMissingPortrait, TypeMissingFeatures,
+        TypeIncidentVehicle, TypeIncidentItem, TypeVerificationDna
+    };
 
     /// <summary>
     /// Lấy MIME type từ phần mở rộng đã được kiểm tra.

@@ -152,6 +152,30 @@ public class ImageService(ApplicationDbContext db) : IImageService
         AccessControl.Require(AuthorizationPolicies.ResourceFile, AuthorizationPolicies.ActionCreate);
         req.MaTaiKhoanTaiLen = AccessControl.UserId!.Value;   // luôn lấy từ token, bỏ qua giá trị UI gửi lên
 
+        if (!req.MaHoSoThiThe.HasValue && !req.MaHoSoMatTich.HasValue
+            && !req.MaTinBao.HasValue && !req.MaXacMinh.HasValue)
+            throw new InvalidOperationException("Ảnh phải gắn với ít nhất một tin báo, hồ sơ thi thể, hồ sơ mất tích hoặc xác minh.");
+
+        if (!ImageHelper.LoaiHopLe.Contains(req.LoaiHinhAnh))
+            throw new InvalidOperationException("Loại hình ảnh không hợp lệ.");
+
+        // Người dân (phạm vi OWN) chỉ được thêm ảnh vào tin báo do chính mình tạo
+        if (req.MaTinBao.HasValue && AccessControl.RoleCode == AuthorizationPolicies.RoleCitizen)
+        {
+            var laCuaToi = await db.Database
+                .SqlQuery<int>($"SELECT COUNT(*) AS [Value] FROM TinBao WHERE MaTinBao = {req.MaTinBao} AND MaTaiKhoanTiepNhan = {req.MaTaiKhoanTaiLen}")
+                .SingleAsync();
+            if (laCuaToi == 0)
+                throw new InvalidOperationException("Bạn không có quyền thêm ảnh vào tin báo này.");
+        }
+
+        if (req.MaTinBao.HasValue
+            && await db.Images.CountAsync(x => x.MaTinBao == req.MaTinBao && x.TrangThai == "HoatDong") >= ImageHelper.MaxAnhMoiTinBao)
+            throw new InvalidOperationException($"Tin báo đã đủ {ImageHelper.MaxAnhMoiTinBao} ảnh.");
+
+        if (req.MaHoSoMatTich.HasValue
+            && await db.Images.CountAsync(x => x.MaHoSoMatTich == req.MaHoSoMatTich && x.TrangThai == "HoatDong") >= ImageHelper.MaxAnhMoiHoSoMatTich)
+            throw new InvalidOperationException($"Hồ sơ mất tích đã đủ {ImageHelper.MaxAnhMoiHoSoMatTich} ảnh.");
 
         if (!File.Exists(req.FilePath))
         {
@@ -223,6 +247,15 @@ public class ImageService(ApplicationDbContext db) : IImageService
         {
             var hashBytes = await MD5.HashDataAsync(fs);
             hashMd5 = Convert.ToHexString(hashBytes).ToLowerInvariant();
+        }
+
+        var daCo = await db.Images.AnyAsync(x => x.TrangThai == "HoatDong" && x.HashMD5 == hashMd5
+            && x.MaTinBao == req.MaTinBao && x.MaHoSoMatTich == req.MaHoSoMatTich
+            && x.MaHoSoThiThe == req.MaHoSoThiThe && x.MaXacMinh == req.MaXacMinh);
+        if (daCo)
+        {
+            File.Delete(destFilePath);
+            throw new InvalidOperationException("Ảnh này đã được tải lên cho hồ sơ này (trùng mã băm).");
         }
 
         int? width = null;

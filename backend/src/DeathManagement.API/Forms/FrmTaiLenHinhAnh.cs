@@ -11,6 +11,8 @@ public class FrmTaiLenHinhAnh : Form
     private readonly ComboBox cboLoaiHinhAnh = new() { DropDownStyle = ComboBoxStyle.DropDownList, Font = UITheme.FontRegular(9.5f) };
     private readonly NumericUpDown numMaThiThe = new() { Font = UITheme.FontRegular(9.5f), Minimum = 0, Maximum = 1000000, Value = 0 };
     private readonly NumericUpDown numMaMatTich = new() { Font = UITheme.FontRegular(9.5f), Minimum = 0, Maximum = 1000000, Value = 0 };
+    private readonly NumericUpDown numMaTinBao = new() { Font = UITheme.FontRegular(9.5f), Minimum = 0, Maximum = 1000000, Value = 0 };
+    private readonly NumericUpDown numMaXacMinh = new() { Font = UITheme.FontRegular(9.5f), Minimum = 0, Maximum = 1000000, Value = 0 };
     private readonly CheckBox chkNhayCam = new() { Text = "Ảnh nhạy cảm pháp y (Chỉ cán bộ & Admin có quyền xem - NFR1.2)", Font = UITheme.FontBold(8.5f), ForeColor = UITheme.Red, AutoSize = true };
     private readonly TextBox txtMoTa = new() { Font = UITheme.FontRegular(9.5f), Multiline = true, Height = 60, PlaceholderText = "Nhập ghi chú hoặc mô tả đặc điểm nhận dạng trong ảnh..." };
 
@@ -66,10 +68,11 @@ public class FrmTaiLenHinhAnh : Form
 
     public ImageDto? ResultImage { get; private set; }
 
-    public FrmTaiLenHinhAnh(long? defaultMaThiThe = null, long? defaultMaMatTich = null)
+    public FrmTaiLenHinhAnh(long? defaultMaThiThe = null, long? defaultMaMatTich = null,
+                            int? defaultMaTinBao = null, long? defaultMaXacMinh = null)
     {
         Text = "Tải hình ảnh & Tệp đính kèm mới vào hệ thống";
-        ClientSize = new Size(680, 620);
+        ClientSize = new Size(680, 660);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -80,6 +83,8 @@ public class FrmTaiLenHinhAnh : Form
 
         if (defaultMaThiThe.HasValue) numMaThiThe.Value = defaultMaThiThe.Value;
         if (defaultMaMatTich.HasValue) numMaMatTich.Value = defaultMaMatTich.Value;
+        if (defaultMaTinBao.HasValue) numMaTinBao.Value = defaultMaTinBao.Value;
+        if (defaultMaXacMinh.HasValue) numMaXacMinh.Value = defaultMaXacMinh.Value;
 
         InitControls();
         BuildUI();
@@ -117,39 +122,7 @@ public class FrmTaiLenHinhAnh : Form
         btnHuy.Click += (s, e) => Close();
         btnTaiLen.Click += async (s, e) => await ThucHienTaiLenAsync();
 
-        // Xử lý kéo thả (Drag and drop)
-        DragEnter += (_, e) =>
-        {
-            if (e.Data?.GetDataPresent(DataFormats.FileDrop) == true)
-            {
-                e.Effect = DragDropEffects.Copy;
-            }
-            else
-            {
-                e.Effect = DragDropEffects.None;
-            }
-        };
-
-        DragDrop += (_, e) =>
-        {
-            if (e.Data?.GetData(DataFormats.FileDrop) is string[] files
-                && files.Length > 0)
-            {
-                if (files.Length > MaxSoAnh)
-                {
-                    MessageBox.Show(
-                        $"Chỉ được kéo-thả tối đa {MaxSoAnh} ảnh mỗi lần.",
-                        "Vượt quá số lượng cho phép",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Warning);
-                    return;
-                }
-
-                // Dùng chung luồng kiểm tra như khi chọn bằng hộp thoại.
-                XuLyDanhSachAnhKeoTha(files);
-            }
-        };
-
+        BatKeoTha(this);
     }
 
     private void BuildUI()
@@ -164,6 +137,7 @@ public class FrmTaiLenHinhAnh : Form
             AutoSize = true,
             Location = new Point(20, 12)
         };
+
         var lblSub = new Label
         {
             Text = "Hỗ trợ JPG, JPEG, PNG, BMP | Tối đa 10 MB/ảnh | Tối đa 5 ảnh/lần",
@@ -172,24 +146,48 @@ public class FrmTaiLenHinhAnh : Form
             AutoSize = true,
             Location = new Point(20, 34)
         };
+
         pnlHeader.Controls.AddRange(new Control[] { lblTitle, lblSub });
 
         // 2. Body Card
         var pnlCard = new Panel
         {
             Location = new Point(20, 75),
-            Size = new Size(640, 520),
+            Size = new Size(640, 560),
             BackColor = Color.White,
             Padding = new Padding(24)
         };
+
         pnlCard.Paint += (s, e) =>
         {
             using var pen = new Pen(UITheme.Line);
             e.Graphics.DrawRectangle(pen, 0, 0, pnlCard.Width - 1, pnlCard.Height - 1);
         };
 
-        // Dòng chọn file
-        var lblFile = CreateLabel("TỆP NGUỒN CẦN TẢI LÊN:", 24, 20);
+        BatKeoTha(pnlCard);
+        BatKeoTha(picPreview);
+        BatKeoTha(txtDuongDanTep);
+
+        private void BatKeoTha(Control c)
+    {
+        c.AllowDrop = true;
+        c.DragEnter += (_, e) => e.Effect = e.Data?.GetDataPresent(DataFormats.FileDrop) == true
+            ? DragDropEffects.Copy : DragDropEffects.None;
+        c.DragDrop += (_, e) =>
+        {
+            if (e.Data?.GetData(DataFormats.FileDrop) is not string[] files || files.Length == 0) return;
+            if (files.Length > MaxSoAnh)
+            {
+                MessageBox.Show($"Chỉ được kéo-thả tối đa {MaxSoAnh} ảnh mỗi lần.", "Vượt quá số lượng cho phép",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            XuLyDanhSachAnhKeoTha(files);
+        };
+    }
+
+    // Dòng chọn file
+    var lblFile = CreateLabel("TỆP NGUỒN CẦN TẢI LÊN:", 24, 20);
         txtDuongDanTep.Location = new Point(24, 42);
         txtDuongDanTep.Size = new Size(460, 32);
         btnChonFile.Location = new Point(494, 40);
@@ -215,6 +213,16 @@ public class FrmTaiLenHinhAnh : Form
         txtMoTa.Location = new Point(24, 274);
         txtMoTa.Size = new Size(580, 60);
 
+        var lblTinBao = CreateLabel("MÃ TIN BÁO (NẾU CÓ):", 24, 220);
+        numMaTinBao.Location = new Point(24, 242); numMaTinBao.Size = new Size(190, 30);
+        var lblXacMinh = CreateLabel("MÃ XÁC MINH (NẾU CÓ):", 234, 220);
+        numMaXacMinh.Location = new Point(234, 242); numMaXacMinh.Size = new Size(190, 30);
+
+        chkNhayCam.Location = new Point(24, 282);
+        // lblMoTa y: 252 -> 312 ; txtMoTa y: 274 -> 334
+        // prgTienTrinh y: 350 -> 410 ; lblTrangThai y: 372 -> 432
+        // btnTaiLen, btnHuy y: 410 -> 470
+
         // Progress bar
         prgTienTrinh.Location = new Point(24, 350);
         prgTienTrinh.Size = new Size(580, 16);
@@ -230,6 +238,8 @@ public class FrmTaiLenHinhAnh : Form
             lblLoai, cboLoaiHinhAnh,
             lblThiThe, numMaThiThe,
             lblMatTich, numMaMatTich,
+            lblTinBao, numMaTinBao,
+            lblXacMinh, numMaXacMinh,
             chkNhayCam,
             lblMoTa, txtMoTa,
             picPreview,
@@ -320,8 +330,7 @@ public class FrmTaiLenHinhAnh : Form
             }
         }
 
-        _danhSachDuongDanAnh.Clear();
-        _danhSachDuongDanAnh.AddRange(ofd.FileNames);
+        if (!ThemVaoDanhSach(ofd.FileNames)) return;
 
         // Giữ tương thích với TextBox và PictureBox hiện có.
         txtDuongDanTep.Text = _danhSachDuongDanAnh.Count == 1
@@ -430,17 +439,14 @@ public class FrmTaiLenHinhAnh : Form
             ? (long?)numMaMatTich.Value
             : null;
 
-        if (maThiThe == null && maMatTich == null)
-        {
-            var hoi = MessageBox.Show(
-                "Ảnh chưa liên kết với hồ sơ tử thi hoặc hồ sơ mất tích.\n" +
-                "Bạn có chắc muốn tiếp tục?",
-                "Xác nhận liên kết hồ sơ",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question);
+        var maTinBao = numMaTinBao.Value > 0 ? (int?)numMaTinBao.Value : null;
+        var maXacMinh = numMaXacMinh.Value > 0 ? (long?)numMaXacMinh.Value : null;
 
-            if (hoi != DialogResult.Yes)
-                return;
+        if (maThiThe == null && maMatTich == null && maTinBao == null && maXacMinh == null)
+        {
+            MessageBox.Show("Phải nhập ít nhất một mã hồ sơ: tin báo, thi thể, mất tích hoặc xác minh.",
+                "Thiếu liên kết hồ sơ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
         }
 
         btnTaiLen.Enabled = false;
@@ -488,6 +494,8 @@ public class FrmTaiLenHinhAnh : Form
                     var req = new UploadImageRequest
                     {
                         FilePath = path,
+                        MaTinBao = maTinBao,
+                        MaXacMinh = maXacMinh,
                         LoaiHinhAnh =
                             cboLoaiHinhAnh.SelectedItem?.ToString()
                             ?? "ThiThe_KhamNghiem",
@@ -612,8 +620,7 @@ public class FrmTaiLenHinhAnh : Form
             }
         }
 
-        _danhSachDuongDanAnh.Clear();
-        _danhSachDuongDanAnh.AddRange(files);
+        if (!ThemVaoDanhSach(ofd.FileNames)) return;
 
         txtDuongDanTep.Text = files.Length == 1
             ? files[0]
@@ -641,5 +648,21 @@ public class FrmTaiLenHinhAnh : Form
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning);
         }
+    }
+
+    private bool ThemVaoDanhSach(IEnumerable<string> files)
+    {
+        var moi = _danhSachDuongDanAnh.ToList();
+        foreach (var p in files)
+            if (!moi.Contains(p, StringComparer.OrdinalIgnoreCase)) moi.Add(p);
+        if (moi.Count > MaxSoAnh)
+        {
+            MessageBox.Show($"Danh sách chỉ được tối đa {MaxSoAnh} ảnh.", "Vượt quá số lượng cho phép",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return false;
+        }
+        _danhSachDuongDanAnh.Clear();
+        _danhSachDuongDanAnh.AddRange(moi);
+        return true;
     }
 }
