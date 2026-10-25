@@ -1,5 +1,6 @@
 using DeathManagement.API.DTOs.User;
 using DeathManagement.API.Entities;
+using DeathManagement.API.Common;
 using DeathManagement.API.Repositories;
 using DeathManagement.API.Repositories.Interfaces;
 using DeathManagement.API.Security;
@@ -178,31 +179,11 @@ public class UserService : IUserService
 
     private static UserDto MapToDto(User user)
     {
-<<<<<<< HEAD
         string tenVaiTro = !string.IsNullOrEmpty(user.Role?.TenVaiTro)
             ? user.Role.TenVaiTro
-            : user.MaVaiTro switch
-            {
-                1 => "Quản trị hệ thống",
-                2 => "Công an / cán bộ xác minh",
-                3 => "Công an có thẩm quyền duyệt",
-                4 => "Nhân viên nhà xác",
-                5 => "Người dân / người thân",
-                _ => "Không xác định"
-            };
+            : RoleConstants.GetName(user.MaVaiTro);
 
-        string maCodeVaiTro = user.Role?.Code ?? user.MaVaiTro switch
-        {
-            1 => "ADMIN",
-            2 => "CONG_AN",
-            3 => "CONG_AN_DUYET",
-            4 => "NHA_XAC",
-            5 => "NGUOI_DAN",
-            _ => "OTHER"
-        };
-=======
-        string tenVaiTro = user.Role?.TenVaiTro ?? "KhongXacDinh";
->>>>>>> origin/B-NgocTus
+        string maCodeVaiTro = user.Role?.Code ?? RoleConstants.GetCode(user.MaVaiTro);
 
         return new UserDto
         {

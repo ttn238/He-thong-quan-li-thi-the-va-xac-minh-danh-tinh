@@ -196,20 +196,11 @@ public class FrmDashboard : Form
             int cardWidth = 260;
             int gap = 20;
 
-<<<<<<< HEAD
             pnlCards.Controls.Add(CreateStatCard("TỔNG TÀI KHOẢN", lblTongUser, "Toàn hệ thống", UITheme.Navy, 0 * (cardWidth + gap)));
             pnlCards.Controls.Add(CreateStatCard("ĐANG HOẠT ĐỘNG", lblUserHoatDong, "Được phép đăng nhập", UITheme.Green, 1 * (cardWidth + gap)));
             pnlCards.Controls.Add(CreateStatCard("ĐANG BỊ KHÓA", lblUserKhoa, "Khóa tạm / vô hiệu hóa", UITheme.Red, 2 * (cardWidth + gap)));
             pnlCards.Controls.Add(CreateStatCard("DANH MỤC VAI TRÒ", lblTongRole, "Cấu hình phân quyền", UITheme.Blue, 3 * (cardWidth + gap)));
         }
-
-=======
-        pnlCards.Controls.Add(CreateStatCard("TỔNG TÀI KHOẢN", lblTongUser, "Toàn hệ thống", UITheme.Navy, 0 * (cardWidth + gap)));
-        pnlCards.Controls.Add(CreateStatCard("ĐANG HOẠT ĐỘNG", lblUserHoatDong, "Được phép đăng nhập", UITheme.Green, 1 * (cardWidth + gap)));
-        pnlCards.Controls.Add(CreateStatCard("ĐANG BỊ KHÓA", lblUserKhoa, "Khóa tạm / vô hiệu hóa", UITheme.Red, 2 * (cardWidth + gap)));
-        pnlCards.Controls.Add(CreateStatCard("DANH MỤC VAI TRÒ", lblTongRole, "Cấu hình phân quyền", UITheme.Blue, 3 * (cardWidth + gap)));
-        pnlCards.Visible = laAdmin;   // thống kê tài khoản chỉ dành cho người có quyền ACCOUNT:VIEW
->>>>>>> origin/B-NgocTus
         // Action Center Panel
         var pnlActionCenter = new Panel
         {
@@ -277,30 +268,21 @@ public class FrmDashboard : Form
             }));
         }
 
-<<<<<<< HEAD
-        pnlButtons.Controls.Add(CreateQuickActionButton(isCitizen ? "📝 Khai báo tin báo sự việc / mất tích" : "📋 Tiếp nhận tin báo sự việc", ColorTranslator.FromHtml("#0984e3"), () =>
+        if (AccessControl.Can(ResourceIncident, ActionCreate))
         {
-            using var f = new FrmTiepNhanTinBao();
-            f.ShowDialog(this);
-        }));
-
-        // Chức năng nghiệp vụ tử thi và AI chỉ hiển thị cho cán bộ / admin, không dành cho người dân
-        if (!isCitizen)
-        {
-            pnlButtons.Controls.Add(CreateQuickActionButton("📁 Tiếp nhận hồ sơ tử thi (Body)", ColorTranslator.FromHtml("#34495e"), () =>
+            pnlButtons.Controls.Add(CreateQuickActionButton(isCitizen ? "Khai báo tin báo sự việc / mất tích" : "Tiếp nhận tin báo sự việc", ColorTranslator.FromHtml("#0984e3"), () =>
             {
-                MessageBox.Show("Chức năng Tiếp nhận tử thi đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                if (!PermissionUi.Check(this, ResourceIncident, ActionCreate)) return;
+                using var f = new FrmTiepNhanTinBao();
+                f.ShowDialog(this);
             }));
+        }
 
-            pnlButtons.Controls.Add(CreateQuickActionButton("🔍 Đối chiếu danh tính (AI Matching)", ColorTranslator.FromHtml("#27ae60"), () =>
-            {
-=======
         if (AccessControl.Can(ResourceMatching, ActionView))
         {
             pnlButtons.Controls.Add(CreateQuickActionButton("Đối chiếu danh tính (AI Matching)", ColorTranslator.FromHtml("#27ae60"), () =>
             {
                 if (!PermissionUi.Check(this, ResourceMatching, ActionView)) return;
->>>>>>> origin/B-NgocTus
                 MessageBox.Show("Chức năng Đối chiếu danh tính AI đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }));
         }
@@ -394,22 +376,11 @@ public class FrmDashboard : Form
 
     private void LoadThongKe()
     {
-<<<<<<< HEAD
-        var tk = Session.TaiKhoan;
-        var laAdmin = tk != null && (
-            tk.TenVaiTro.Contains("Quản trị", StringComparison.OrdinalIgnoreCase) ||
-            tk.TenVaiTro.Contains("ADMIN", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(tk.TenDangNhap, "admin", StringComparison.OrdinalIgnoreCase));
-
-        // Không cần nạp thống kê tài khoản nếu không phải Quản trị viên
-        if (!laAdmin) return;
-=======
         if (!AccessControl.Can(ResourceAccount, ActionView))
         {
             lblTongUser.Text = lblUserHoatDong.Text = lblUserKhoa.Text = lblTongRole.Text = "-";
             return;
         }
->>>>>>> origin/B-NgocTus
 
         try
         {
