@@ -453,6 +453,10 @@ export const UserManagement: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
       {/* Modal Gán / Đổi Vai Trò Nhanh */}
       {roleModalOpen && roleAssigningUser && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">

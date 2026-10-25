@@ -1,0 +1,220 @@
+{
+  "info": {
+    "name": "QLTLDT - Role Management API Collection (4.5)",
+    "description": "Postman Collection for verifying Role Management endpoints under /api/v1/roles with authentication and authorization test scenarios.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:5103"
+    },
+    {
+      "key": "adminToken",
+      "value": "admin"
+    },
+    {
+      "key": "userToken",
+      "value": "user"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. GET Roles - Without Login (Expect 401)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/roles",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "roles"]
+        }
+      }
+    },
+    {
+      "name": "2. GET Roles - Non-Admin (Expect 403)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{userToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/roles",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "roles"]
+        }
+      }
+    },
+    {
+      "name": "3. GET Roles - Administrator (Expect 200)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/roles",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "roles"]
+        }
+      }
+    },
+    {
+      "name": "4. GET Role Details by ID - Valid (Expect 200)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/roles/1",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "roles", "1"]
+        }
+      }
+    },
+    {
+      "name": "5. GET Role Details by ID - Not Found (Expect 404)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/roles/9999",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "roles", "9999"]
+        }
+      }
+    },
+    {
+      "name": "6. GET System Permissions (Expect 200)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/roles/permissions",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "roles", "permissions"]
+        }
+      }
+    },
+    {
+      "name": "7. PUT Assign Role - Self Change (Expect 409 Conflict)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"maTaiKhoan\": 1,\n  \"maVaiTro\": 2\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/roles/assign",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "roles", "assign"]
+        }
+      }
+    },
+    {
+      "name": "8. PUT Assign Role - Target Account Not Found (Expect 404)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"maTaiKhoan\": 99999,\n  \"maVaiTro\": 2\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/roles/assign",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "roles", "assign"]
+        }
+      }
+    },
+    {
+      "name": "9. PUT Assign Role - Valid Request (Expect 200)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"maTaiKhoan\": 3,\n  \"maVaiTro\": 2\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/roles/assign",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "roles", "assign"]
+        }
+      }
+    },
+    {
+      "name": "10. PUT Update Permissions - Invalid Scope (Expect 400)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"permissions\": [\n    {\n      \"maQuyen\": 1,\n      \"phamVi\": \"INVALID_SCOPE\"\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/roles/2/permissions",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "roles", "2", "permissions"]
+        }
+      }
+    }
+  ]
+}
