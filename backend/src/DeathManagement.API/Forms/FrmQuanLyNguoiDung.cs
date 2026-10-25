@@ -5,6 +5,7 @@ using DeathManagement.API.Entities;
 using DeathManagement.API.Security;
 using DeathManagement.API.Services;
 using Microsoft.EntityFrameworkCore;
+using static DeathManagement.API.Security.AuthorizationPolicies;
 
 namespace DeathManagement.API.Forms;
 
@@ -44,6 +45,7 @@ public class FrmQuanLyNguoiDung : Form
 
     public FrmQuanLyNguoiDung()
     {
+        AccessControl.Require(ResourceAccount, ActionView);   // chặn từ gốc nếu thiếu quyền
         Text = "Quản lý Người dùng & Phân quyền Tài khoản";
         ClientSize = new Size(1120, 680);
         StartPosition = FormStartPosition.CenterScreen;
@@ -124,6 +126,12 @@ public class FrmQuanLyNguoiDung : Form
         };
         btnThem.FlatAppearance.BorderSize = 0;
         btnThem.Click += (s, e) =>
+        {
+
+            if (!PermissionUi.Check(this, ResourceAccount, ActionCreate)) return;   
+            using var f = new FrmThemSuaNguoiDung();
+            if (f.ShowDialog() == DialogResult.OK) LoadUsers();
+        };
         {
             using var f = new FrmThemSuaNguoiDung();
             if (f.ShowDialog() == DialogResult.OK) LoadUsers();
@@ -232,6 +240,11 @@ public class FrmQuanLyNguoiDung : Form
 
         pnlBottom.Controls.AddRange(new Control[] { lblTongSo, btnSua, btnKhoa, lblQuickRole, cboGanVaiTro, btnXacNhanGanRole, btnDong });
 
+        // Ẩn/vô hiệu hóa theo quyền (gợi ý giao diện; interceptor ở DB vẫn chặn nếu bị lách)
+        btnThem.Visible = AccessControl.Can(ResourceAccount, ActionCreate);
+        btnSua.Enabled = btnKhoa.Enabled = AccessControl.Can(ResourceAccount, ActionUpdate);
+        cboGanVaiTro.Enabled = btnXacNhanGanRole.Enabled = AccessControl.Can(ResourcePermission, ActionUpdate);
+
         // Add to Form
         Controls.Add(pnlGridContainer);
         Controls.Add(pnlBottom);
@@ -287,6 +300,7 @@ public class FrmQuanLyNguoiDung : Form
     {
         try
         {
+            AccessControl.Require(ResourceAccount, ActionView);
             using var db = Program.NewDb();
             var roles = db.Roles.AsNoTracking().ToList();
 
@@ -434,7 +448,8 @@ public class FrmQuanLyNguoiDung : Form
                 // Ghi vết nhật ký
                 try
                 {
-                    await db.Database.ExecuteSqlInterpolatedAsync($"EXEC sp_GhiNhatKy N'{hanhDong}TaiKhoan', {target.TenDangNhap}, {curId}");
+                    var tenHanhDong = $"{hanhDong}TaiKhoan";   // truyền như THAM SỐ, không nhét {..} vào trong N'...'
+                    await db.Database.ExecuteSqlInterpolatedAsync($"EXEC sp_GhiNhatKy {tenHanhDong}, {target.TenDangNhap}, {curId}");
                 }
                 catch { }
 

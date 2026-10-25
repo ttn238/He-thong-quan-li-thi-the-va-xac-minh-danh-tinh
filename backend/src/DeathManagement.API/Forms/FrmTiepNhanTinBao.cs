@@ -1,4 +1,13 @@
+<<<<<<< Updated upstream
+=======
+using DeathManagement.API.DTOs.Image;
+using DeathManagement.API.DTOs.TinBao;
+using DeathManagement.API.Helpers;
+using DeathManagement.API.Services;
+using Microsoft.EntityFrameworkCore;
+>>>>>>> Stashed changes
 namespace DeathManagement.API.Forms;
+using DeathManagement.API.Security;
 
 public class FrmTiepNhanTinBao : Form
 {
@@ -8,7 +17,37 @@ public class FrmTiepNhanTinBao : Form
 
     private readonly ErrorProvider _err = new() { BlinkStyle = ErrorBlinkStyle.NeverBlink };
     private readonly ToolTip _tip = new();
+<<<<<<< Updated upstream
     private string? _anhDuongDan;
+=======
+
+    private static readonly string[] MucDoDb = { "KhanCap", "Cao", "BinhThuong", "Thap" };
+    private int? _maTinBao;                       // có giá trị sau khi tạo tin báo thành công
+    private readonly List<AnhChon> _dsAnh = new();
+    private readonly ImageList _imgThumb = new() { ImageSize = new Size(40, 40), ColorDepth = ColorDepth.Depth32Bit };
+    private readonly ListView lvAnh = new()
+    {
+        Dock = DockStyle.Bottom,
+        Height = 110,
+        View = View.Details,
+        FullRowSelect = true,
+        HideSelection = false,
+        MultiSelect = false,
+        HeaderStyle = ColumnHeaderStyle.None,
+        Font = UITheme.FontRegular(8.5f)
+    };
+
+    private sealed class AnhChon(string duongDan, string ten, long size)
+    {
+        public string DuongDan { get; } = duongDan;
+        public string Ten { get; } = ten;
+        public long Size { get; } = size;
+        public string TrangThai { get; set; } = "Chờ gửi";
+        public long? MaHinhAnh { get; set; }
+    }
+
+    private sealed class LoaiTinBaoItem { public int Ma { get; set; } public string Ten { get; set; } = ""; }
+>>>>>>> Stashed changes
 
     // ---- Khu vực trái: ảnh + AI ----
     private readonly PictureBox picHienTruong = new() { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.FromArgb(30, 30, 30) };
@@ -267,8 +306,11 @@ public class FrmTiepNhanTinBao : Form
 
     private void GuiTinBao()
     {
+        // [PHÂN QUYỀN] Chỉ vai trò có INCIDENT:CREATE (CONG_AN, CONG_AN_DUYET; NGUOI_DAN phạm vi OWN)
+        if (!PermissionUi.Check(this, AuthorizationPolicies.ResourceIncident, AuthorizationPolicies.ActionCreate)) return;
         if (!KiemTraDauVao()) return;
         // Bước 2 sẽ gọi TinBaoService ở đây. Chưa lưu nên KHÔNG báo thành công.
+        // Khi nối DB: NguonTin = vai trò NGUOI_DAN ? "NguoiDan" : "CanBo"; MaTaiKhoanTiepNhan = AccessControl.UserId
         MessageBox.Show("Dữ liệu hợp lệ. Chức năng lưu vào CSDL chưa được nối nên tin báo CHƯA được gửi.",
             "Kiểm tra dữ liệu", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
