@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using DeathManagement.API.Common;
 
 namespace DeathManagement.API.Entities;
 
@@ -22,6 +23,10 @@ public class Role
     [NotMapped]
     public DateTime NgayTao { get; set; } = DateTime.UtcNow;
 
-    // Navigation property
+    [NotMapped]
+    public string Code => !string.IsNullOrEmpty(MaCode) ? MaCode : RoleConstants.GetCode(MaVaiTro);
+
+    // Navigation properties
     public virtual ICollection<User> Users { get; set; } = new List<User>();
+    public virtual ICollection<RolePermission> RolePermissions { get; set; } = new List<RolePermission>();
 }

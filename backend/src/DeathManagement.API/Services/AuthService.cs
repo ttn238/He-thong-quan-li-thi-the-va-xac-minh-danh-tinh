@@ -83,11 +83,18 @@ public class AuthService(ApplicationDbContext db) : IAuthService
         tk.SoLanDangNhapSai = 0;
         tk.KhoaDenThoiDiem = null;
         tk.LanDangNhapCuoi = now;
+        // Nâng cấp hash cũ (SHA-256 không muối từ seed) lên PBKDF2 ngay khi đăng nhập đúng
+        if (PasswordHasher.NeedsRehash(tk.MatKhauHash))
+            tk.MatKhauHash = PasswordHasher.HashPassword(matKhau);
         await db.SaveChangesAsync();
 
         await GhiNhatKyAsync(tk.MaTaiKhoan, $"Thanh cong: {ten}");
+
+        // Kết nối danh tính với vai trò/quyền: tên vai trò (DB) -> mã vai trò -> JWT chứa quyền
+        var roleCode = AuthorizationPolicies.ResolveRoleCode(tk.Role?.TenVaiTro);
+        var token = JwtTokenService.CreateToken(tk.MaTaiKhoan, tk.TenDangNhap, tk.HoTen, roleCode, tk.DonVi);
         return (KetQuaDangNhap.ThanhCong,
-            new LoginResponse(tk.MaTaiKhoan, tk.TenDangNhap, tk.HoTen, tk.Role?.TenVaiTro ?? "", tk.DonVi),
+            new LoginResponse(tk.MaTaiKhoan, tk.TenDangNhap, tk.HoTen, tk.Role?.TenVaiTro ?? "", tk.DonVi, roleCode, token),
             null);
     }
 

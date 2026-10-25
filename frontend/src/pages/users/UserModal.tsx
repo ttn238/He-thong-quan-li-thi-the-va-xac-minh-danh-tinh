@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, CreateUserPayload, UpdateUserPayload } from '../../types/User';
+import { User, CreateUserPayload, UpdateUserPayload, SYSTEM_ROLES } from '../../types/User';
 
 interface UserModalProps {
   isOpen: boolean;
@@ -25,7 +25,7 @@ export const UserModal: React.FC<UserModalProps> = ({
     cccd: '',
     donVi: '',
     chucVu: '',
-    maVaiTro: 3,
+    maVaiTro: 5, // Default to NGUOI_DAN
   });
 
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +54,7 @@ export const UserModal: React.FC<UserModalProps> = ({
         cccd: '',
         donVi: '',
         chucVu: '',
-        maVaiTro: 3,
+        maVaiTro: 5,
       });
     }
     setError(null);
@@ -71,6 +71,10 @@ export const UserModal: React.FC<UserModalProps> = ({
         setError('Vui lòng nhập tên đăng nhập.');
         return;
       }
+      if (!/^[a-zA-Z0-9_]{3,50}$/.test(formData.tenDangNhap.trim())) {
+        setError('Tên đăng nhập chỉ chứa chữ cái, số, dấu gạch dưới (3 - 50 ký tự).');
+        return;
+      }
       if (!formData.matKhau || formData.matKhau.length < 6) {
         setError('Mật khẩu bắt buộc và phải có ít nhất 6 ký tự.');
         return;
@@ -79,6 +83,21 @@ export const UserModal: React.FC<UserModalProps> = ({
 
     if (!formData.hoTen.trim()) {
       setError('Vui lòng nhập họ và tên.');
+      return;
+    }
+
+    if (!formData.email?.trim() && !formData.soDienThoai?.trim()) {
+      setError('Vui lòng cung cấp ít nhất một hình thức liên lạc (Email hoặc Số điện thoại).');
+      return;
+    }
+
+    if (formData.cccd?.trim() && !/^[0-9]{9,12}$/.test(formData.cccd.trim())) {
+      setError('Số CCCD/Định danh phải gồm từ 9 đến 12 chữ số.');
+      return;
+    }
+
+    if (formData.soDienThoai?.trim() && !/^[0-9+]{9,15}$/.test(formData.soDienThoai.trim())) {
+      setError('Số điện thoại không hợp lệ (9 đến 15 chữ số).');
       return;
     }
 
@@ -141,7 +160,7 @@ export const UserModal: React.FC<UserModalProps> = ({
                   className="w-full px-3 py-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500"
                   value={formData.tenDangNhap}
                   onChange={(e) => setFormData({ ...formData, tenDangNhap: e.target.value })}
-                  placeholder="Ví dụ: nguyenvanb"
+                  placeholder="canbo_dieu_tra"
                 />
               </div>
 
@@ -152,7 +171,6 @@ export const UserModal: React.FC<UserModalProps> = ({
                 <input
                   type="password"
                   required
-                  minLength={6}
                   className="w-full px-3 py-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500"
                   value={formData.matKhau}
                   onChange={(e) => setFormData({ ...formData, matKhau: e.target.value })}
@@ -172,7 +190,7 @@ export const UserModal: React.FC<UserModalProps> = ({
               className="w-full px-3 py-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500"
               value={formData.hoTen}
               onChange={(e) => setFormData({ ...formData, hoTen: e.target.value })}
-              placeholder="Ví dụ: Nguyễn Văn B"
+              placeholder="Nguyễn Văn A"
             />
           </div>
 
@@ -184,7 +202,7 @@ export const UserModal: React.FC<UserModalProps> = ({
                 className="w-full px-3 py-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="email@example.com"
+                placeholder="email@domain.com"
               />
             </div>
 
@@ -202,7 +220,7 @@ export const UserModal: React.FC<UserModalProps> = ({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Số CCCD</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Số CCCD / Định danh</label>
               <input
                 type="text"
                 className="w-full px-3 py-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500"
@@ -214,16 +232,18 @@ export const UserModal: React.FC<UserModalProps> = ({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Vai trò <span className="text-red-500">*</span>
+                Vai trò hệ thống <span className="text-red-500">*</span>
               </label>
               <select
                 className="w-full px-3 py-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500"
                 value={formData.maVaiTro}
                 onChange={(e) => setFormData({ ...formData, maVaiTro: Number(e.target.value) })}
               >
-                <option value={1}>Quản trị viên (Admin)</option>
-                <option value={2}>Cán bộ giám định</option>
-                <option value={3}>Người dân</option>
+                {SYSTEM_ROLES.map((role) => (
+                  <option key={role.id} value={role.id}>
+                    {role.label} ({role.code})
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -236,7 +256,7 @@ export const UserModal: React.FC<UserModalProps> = ({
                 className="w-full px-3 py-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500"
                 value={formData.donVi}
                 onChange={(e) => setFormData({ ...formData, donVi: e.target.value })}
-                placeholder="Phòng Kỹ thuật hình sự..."
+                placeholder="Công an Q1, Nhà xác TT..."
               />
             </div>
 
@@ -247,7 +267,7 @@ export const UserModal: React.FC<UserModalProps> = ({
                 className="w-full px-3 py-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500"
                 value={formData.chucVu}
                 onChange={(e) => setFormData({ ...formData, chucVu: e.target.value })}
-                placeholder="Giám định viên..."
+                placeholder="Cán bộ điều tra..."
               />
             </div>
           </div>

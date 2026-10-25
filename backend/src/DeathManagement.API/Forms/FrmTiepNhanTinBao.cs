@@ -7,6 +7,7 @@ using DeathManagement.API.Services;
 using Microsoft.EntityFrameworkCore;
 >>>>>>> Stashed changes
 namespace DeathManagement.API.Forms;
+using DeathManagement.API.Security;
 
 public class FrmTiepNhanTinBao : Form
 {
@@ -305,8 +306,11 @@ public class FrmTiepNhanTinBao : Form
 
     private void GuiTinBao()
     {
+        // [PHÂN QUYỀN] Chỉ vai trò có INCIDENT:CREATE (CONG_AN, CONG_AN_DUYET; NGUOI_DAN phạm vi OWN)
+        if (!PermissionUi.Check(this, AuthorizationPolicies.ResourceIncident, AuthorizationPolicies.ActionCreate)) return;
         if (!KiemTraDauVao()) return;
         // Bước 2 sẽ gọi TinBaoService ở đây. Chưa lưu nên KHÔNG báo thành công.
+        // Khi nối DB: NguonTin = vai trò NGUOI_DAN ? "NguoiDan" : "CanBo"; MaTaiKhoanTiepNhan = AccessControl.UserId
         MessageBox.Show("Dữ liệu hợp lệ. Chức năng lưu vào CSDL chưa được nối nên tin báo CHƯA được gửi.",
             "Kiểm tra dữ liệu", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }

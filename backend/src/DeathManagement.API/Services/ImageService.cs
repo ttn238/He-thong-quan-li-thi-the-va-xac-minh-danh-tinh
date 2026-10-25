@@ -4,6 +4,7 @@ using DeathManagement.API.DTOs.Image;
 using DeathManagement.API.Entities;
 using DeathManagement.API.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using DeathManagement.API.Security;
 using Image = DeathManagement.API.Entities.Image;
 
 namespace DeathManagement.API.Services;
@@ -63,10 +64,20 @@ public class ImageService(ApplicationDbContext db) : IImageService
 
     public async Task<List<ImageDto>> LayDanhSachHinhAnhAsync(ImageFilterRequest filter, bool coQuyenXemNhayCam)
     {
+        // [PHÂN QUYỀN] Backend tự quyết định, KHÔNG tin tham số coQuyenXemNhayCam do UI truyền vào
+        AccessControl.Require(AuthorizationPolicies.ResourceFile, AuthorizationPolicies.ActionView);
+        coQuyenXemNhayCam = AccessControl.CanPolicy(AuthorizationPolicies.RequireSensitiveDataViewer);
+        var phamViXem = AccessControl.ScopeOf(AuthorizationPolicies.ResourceFile, AuthorizationPolicies.ActionView);
+        var maNguoiDung = AccessControl.UserId ?? 0;
+
         var q = db.Images
             .AsNoTracking()
             .Include(x => x.TaiKhoanTaiLen)
             .Where(x => x.TrangThai == "HoatDong");
+
+        // NGUOI_DAN (phạm vi OWN): chỉ thấy tệp do chính mình tải lên
+        if (phamViXem == AuthorizationPolicies.ScopeOwn)
+            q = q.Where(x => x.MaTaiKhoanTaiLen == maNguoiDung);
 
         // NFR1.2: Nếu không có quyền Cán bộ/Admin, tuyệt đối ẩn ảnh nhạy cảm
         if (!coQuyenXemNhayCam)
@@ -136,6 +147,10 @@ public class ImageService(ApplicationDbContext db) : IImageService
 
     public async Task<ImageDto> TaiLenHinhAnhAsync(UploadImageRequest req, IProgress<int>? progress = null)
     {
+        // [PHÂN QUYỀN] kiểm tra TRƯỚC khi sao chép tệp để không sinh tệp rác
+        AccessControl.Require(AuthorizationPolicies.ResourceFile, AuthorizationPolicies.ActionCreate);
+        req.MaTaiKhoanTaiLen = AccessControl.UserId!.Value;   // luôn lấy từ token, bỏ qua giá trị UI gửi lên
+
         if (!File.Exists(req.FilePath))
             throw new FileNotFoundException("Tệp nguồn không tồn tại.", req.FilePath);
 
@@ -151,7 +166,7 @@ public class ImageService(ApplicationDbContext db) : IImageService
 
         // Quy tắc NFR1.2: Ảnh tử thi hoặc loại ThiThe_* bắt buộc gán cờ LaNhayCam = true
         var laNhayCam = req.LaNhayCam || req.MaHoSoThiThe.HasValue || req.LoaiHinhAnh.StartsWith("ThiThe_");
-
+        if (laNhayCam) AccessControl.RequirePolicy(AuthorizationPolicies.RequireSensitiveDataViewer);
         var subFolder = laNhayCam ? "secure" : "public";
         var destFolder = Path.Combine(StorageBaseDir, subFolder);
         Directory.CreateDirectory(destFolder);
@@ -263,9 +278,14 @@ public class ImageService(ApplicationDbContext db) : IImageService
 
     public async Task<bool> XoaHinhAnhAsync(long maHinhAnh, long maTaiKhoan)
     {
+        var maNguoiThaoTac = AccessControl.UserId ?? throw AccessControl.NotLoggedIn(AuthorizationPolicies.ResourceFile, AuthorizationPolicies.ActionDelete);
+
         var img = await db.Images.FirstOrDefaultAsync(x => x.MaHinhAnh == maHinhAnh);
         if (img == null || img.TrangThai == "DaXoa")
             return false;
+
+        // Chủ tệp được xóa tệp của mình; người khác phải có FILE:DELETE (tham số maTaiKhoan từ UI bị bỏ qua)
+        AccessControl.RequireSelfOr(img.MaTaiKhoanTaiLen, AuthorizationPolicies.ResourceFile, AuthorizationPolicies.ActionDelete);
 
         img.TrangThai = "DaXoa";
         await db.SaveChangesAsync();
@@ -274,7 +294,7 @@ public class ImageService(ApplicationDbContext db) : IImageService
         {
             var act = $"XOA_ANH#{maHinhAnh}";
             var target = $"HinhAnh#{maHinhAnh}";
-            await db.Database.ExecuteSqlInterpolatedAsync($"EXEC sp_GhiNhatKy {act}, {target}, {maTaiKhoan}");
+            await db.Database.ExecuteSqlInterpolatedAsync($"EXEC sp_GhiNhatKy {act}, {target}, {maNguoiThaoTac}");
         }
         catch { }
 
@@ -283,9 +303,14 @@ public class ImageService(ApplicationDbContext db) : IImageService
 
     public async Task<byte[]?> DocDuLieuHinhAnhAsync(long maHinhAnh, bool coQuyenXemNhayCam)
     {
+        AccessControl.Require(AuthorizationPolicies.ResourceFile, AuthorizationPolicies.ActionView);
+        coQuyenXemNhayCam = AccessControl.CanPolicy(AuthorizationPolicies.RequireSensitiveDataViewer);
+
         var img = await db.Images.AsNoTracking().FirstOrDefaultAsync(x => x.MaHinhAnh == maHinhAnh && x.TrangThai == "HoatDong");
         if (img == null)
             return null;
+
+        AccessControl.RequireOwnerOrAll(AuthorizationPolicies.ResourceFile, AuthorizationPolicies.ActionView, img.MaTaiKhoanTaiLen);
 
         if (img.LaNhayCam && !coQuyenXemNhayCam)
             return null; // NFR1.2: Chặn đọc file nhạy cảm trái phép
