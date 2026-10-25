@@ -1,4 +1,7 @@
-﻿using DeathManagement.API.Data;
+﻿using System.Data;
+using DeathManagement.API.DTOs.TinBao;
+using Microsoft.Data.SqlClient;
+using DeathManagement.API.Data;
 using DeathManagement.API.Security;
 using Microsoft.EntityFrameworkCore;
 using static DeathManagement.API.Security.AuthorizationPolicies;
@@ -14,9 +17,19 @@ public class TinBaoService(ApplicationDbContext db)
         var uid = AccessControl.UserId!.Value;           // lấy từ token, không nhận từ UI
         await db.Database.ExecuteSqlInterpolatedAsync($"EXEC sp_XuLyTinBao {maTinBao}, {uid}, {quyetDinh}");
     }
-    // Khi viết GuiTinBaoAsync: AccessControl.Require(ResourceIncident, ActionCreate);
-    // NguonTin = vai trò NGUOI_DAN ? "NguoiDan" : "CanBo"; MaTaiKhoanTiepNhan = AccessControl.UserId
-    // Xem tin báo: ScopeOf(ResourceIncident, ActionView) == ScopeOwn thì lọc theo người tạo.
+
+    public async Task<int> GuiTinBaoAsync(GuiTinBaoRequest req)
+    {
+        AccessControl.Require(ResourceIncident, ActionCreate);
+        var uid = AccessControl.UserId!.Value;
+        var nguon = AccessControl.RoleCode == RoleCitizen ? "NguoiDan" : "CanBo";
+
+        var pMa = new SqlParameter("@MaTinBaoMoi", SqlDbType.Int) { Direction = ParameterDirection.Output };
+        await db.Database.ExecuteSqlInterpolatedAsync($@"EXEC sp_TaoTinBao
+        {req.MaLoaiTinBao}, {req.TieuDe}, {req.NoiDung}, {req.ThoiGianXayRa}, {req.DiaDiem},
+        {nguon}, {req.HoTenNguoiBao}, {req.SoDienThoaiNguoiBao}, {uid}, {req.MucDoUuTien}, {pMa} OUTPUT");
+        return (int)pMa.Value;
+    }
 }
 
 public class HoSoThiTheService(ApplicationDbContext db)
