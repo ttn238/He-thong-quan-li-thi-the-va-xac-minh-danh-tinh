@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, UserFilterParams, CreateUserPayload, UpdateUserPayload } from '../../types/User';
+import { User, UserFilterParams, CreateUserPayload, UpdateUserPayload, SYSTEM_ROLES } from '../../types/User';
 import userService from '../../services/userService';
+import roleService from '../../services/roleService';
 import authHelper from '../../features/auth/authHelper';
 import UserFilterBar from './UserFilterBar';
 import UserModal from './UserModal';
@@ -23,10 +24,18 @@ export const UserManagement: React.FC = () => {
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
+  // Quick Role Assignment State
+  const [roleModalOpen, setRoleModalOpen] = useState(false);
+  const [roleAssigningUser, setRoleAssigningUser] = useState<User | null>(null);
+  const [newSelectedRoleId, setNewSelectedRoleId] = useState<number>(2);
+  const [roleSubmitting, setRoleSubmitting] = useState(false);
+
   // Reset Password State
   const [resetModalOpen, setResetModalOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [resettingUser, setResettingUser] = useState<User | null>(null);
+  const [resetSubmitting, setResetSubmitting] = useState(false);
 
   const currentUser = authHelper.getCurrentUser();
   const isAdmin = authHelper.isAdmin();
@@ -36,9 +45,9 @@ export const UserManagement: React.FC = () => {
     setError(null);
     try {
       const res = await userService.getUsers(filters);
-      setUsers(res.items);
-      setTotalCount(res.totalCount);
-      setTotalPages(res.totalPages || Math.ceil(res.totalCount / (filters.pageSize || 10)));
+      setUsers(res.items || []);
+      setTotalCount(res.totalCount || 0);
+      setTotalPages(res.totalPages || Math.ceil((res.totalCount || 1) / (filters.pageSize || 10)));
     } catch (err: any) {
       setError(err.message || 'Không thể tải danh sách tài khoản.');
     } finally {
@@ -105,6 +114,7 @@ export const UserManagement: React.FC = () => {
   const handleOpenResetModal = (user: User) => {
     setResettingUser(user);
     setNewPassword('');
+    setConfirmPassword('');
     setResetModalOpen(true);
   };
 
@@ -115,13 +125,20 @@ export const UserManagement: React.FC = () => {
       alert('Mật khẩu mới phải có tối thiểu 6 ký tự.');
       return;
     }
+    if (newPassword !== confirmPassword) {
+      alert('Mật khẩu xác nhận không khớp với mật khẩu mới.');
+      return;
+    }
 
+    setResetSubmitting(true);
     try {
       await userService.resetPassword(resettingUser.maTaiKhoan, { matKhauMoi: newPassword });
       alert(`Đã đặt lại mật khẩu cho tài khoản "${resettingUser.tenDangNhap}" thành công!`);
       setResetModalOpen(false);
     } catch (err: any) {
       alert(err.message || 'Đặt lại mật khẩu thất bại.');
+    } finally {
+      setResetSubmitting(false);
     }
   };
 
@@ -131,7 +148,7 @@ export const UserManagement: React.FC = () => {
       return;
     }
 
-    if (!window.confirm(`CẢNH BÁO: Bạn có chắc chắn muốn xóa tài khoản "${user.tenDangNhap}"? Thao tác này không thể hoàn tác.`)) {
+    if (!window.confirm(`CẢNH BÁO: Bạn có chắc chắn muốn xóa tài khoản "${user.tenDangNhap}"? Thao tác này sẽ chuyển tài khoản sang trạng thái Bị khóa vĩnh viễn.`)) {
       return;
     }
 
@@ -143,188 +160,233 @@ export const UserManagement: React.FC = () => {
     }
   };
 
+  const handleOpenRoleModal = (user: User) => {
+    setRoleAssigningUser(user);
+    setNewSelectedRoleId(user.maVaiTro || 2);
+    setRoleModalOpen(true);
+  };
+
+  const handleAssignRoleSubmit = async () => {
+    if (!roleAssigningUser) return;
+
+    if (roleAssigningUser.maTaiKhoan === currentUser?.maTaiKhoan && roleAssigningUser.maVaiTro === 1 && newSelectedRoleId !== 1) {
+      alert('Quy tắc an toàn: Quản trị viên không thể tự hạ quyền của chính mình!');
+      return;
+    }
+
+    setRoleSubmitting(true);
+    try {
+      const res = await roleService.assignRole({
+        maTaiKhoan: roleAssigningUser.maTaiKhoan,
+        maVaiTro: newSelectedRoleId,
+      });
+      alert(res.message || 'Đã cập nhật vai trò thành công!');
+      setRoleModalOpen(false);
+      await fetchUsers();
+    } catch (err: any) {
+      alert(err.message || 'Gán vai trò thất bại.');
+    } finally {
+      setRoleSubmitting(false);
+    }
+  };
+
+  const getRoleBadge = (user: User) => {
+    const roleDef = SYSTEM_ROLES.find((r) => r.id === user.maVaiTro);
+    const color = roleDef?.badgeColor || 'bg-gray-100 text-gray-800 border-gray-200';
+    const label = user.tenVaiTro || roleDef?.label || 'Không xác định';
+
+    return (
+      <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold border ${color}`}>
+        {label}
+      </span>
+    );
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'HoatDong':
+        return <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">Hoạt động</span>;
+      case 'KhoaTam':
+        return <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700">Khóa tạm</span>;
+      default:
+        return <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">Bị khóa</span>;
+    }
+  };
+
   return (
-    <div className="user-management-page p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Quản lý Tài khoản & Phân quyền</h1>
-          <p className="text-sm text-gray-500">
-            Quản lý danh sách người dùng, vai trò bảo mật, trạng thái hoạt động và mật khẩu.
-          </p>
+    <div className="user-management p-6 bg-gray-50 min-h-screen">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 pb-4 border-b">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Quản lý Tài khoản & Phân quyền</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Phân hệ 4.4: Quản lý danh tính, phân quyền 5 nhóm vai trò và bảo vệ an toàn thông tin
+            </p>
+          </div>
+          {isAdmin && (
+            <div className="mt-4 md:mt-0 flex items-center gap-2">
+              <a
+                href="/roles"
+                className="inline-flex items-center px-4 py-2 bg-slate-800 text-white rounded-md text-sm font-medium hover:bg-slate-900 shadow-sm transition gap-1.5"
+              >
+                <span>🔑</span> Quản lý 5 Vai trò (RBAC)
+              </a>
+              <button
+                onClick={handleOpenCreateModal}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 shadow-sm transition"
+              >
+                + Tạo tài khoản mới
+              </button>
+            </div>
+          )}
         </div>
 
-        {isAdmin && (
-          <button
-            onClick={handleOpenCreateModal}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm shadow-sm transition flex items-center gap-2 self-start md:self-auto"
-          >
-            <span>+ Tạo tài khoản mới</span>
-          </button>
+        {/* Filter Bar */}
+        <UserFilterBar onFilterChange={handleFilterChange} isLoading={loading} />
+
+        {/* Error message */}
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
+            {error}
+          </div>
         )}
-      </div>
 
-      {/* Bộ lọc tìm kiếm */}
-      <UserFilterBar onFilterChange={handleFilterChange} isLoading={loading} />
-
-      {/* Thông báo lỗi */}
-      {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
-          {error}
-        </div>
-      )}
-
-      {/* Bảng danh sách tài khoản */}
-      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm border-collapse">
-            <thead className="bg-gray-50 border-b text-gray-600 uppercase text-xs">
-              <tr>
-                <th className="py-3 px-4">Mã</th>
-                <th className="py-3 px-4">Tài khoản / Họ tên</th>
-                <th className="py-3 px-4">Liên hệ</th>
-                <th className="py-3 px-4">Đơn vị / Chức vụ</th>
-                <th className="py-3 px-4">Vai trò</th>
-                <th className="py-3 px-4">Trạng thái</th>
-                <th className="py-3 px-4 text-center">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {loading && users.length === 0 ? (
+        {/* Users Table */}
+        <div className="bg-white rounded-lg shadow border overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-sm">
+              <thead className="bg-gray-100 text-gray-700 uppercase font-semibold text-xs border-b">
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-gray-500">
-                    Đang tải dữ liệu...
-                  </td>
+                  <th className="py-3 px-4">ID</th>
+                  <th className="py-3 px-4">Tài khoản & Họ tên</th>
+                  <th className="py-3 px-4">Thông tin liên hệ</th>
+                  <th className="py-3 px-4">Đơn vị & Chức vụ</th>
+                  <th className="py-3 px-4">Vai trò (Role)</th>
+                  <th className="py-3 px-4">Trạng thái</th>
+                  <th className="py-3 px-4 text-center">Thao tác</th>
                 </tr>
-              ) : users.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-8 text-center text-gray-500">
-                    Không tìm thấy tài khoản nào phù hợp với bộ lọc.
-                  </td>
-                </tr>
-              ) : (
-                users.map((user) => (
-                  <tr key={user.maTaiKhoan} className="hover:bg-gray-50 transition">
-                    <td className="py-3 px-4 text-gray-500">#{user.maTaiKhoan}</td>
-                    <td className="py-3 px-4">
-                      <div className="font-semibold text-gray-800">{user.tenDangNhap}</div>
-                      <div className="text-gray-600 text-xs">{user.hoTen}</div>
-                      {user.cccd && (
-                        <div className="text-gray-400 text-xs">CCCD: {user.cccd}</div>
-                      )}
-                    </td>
-                    <td className="py-3 px-4">
-                      {user.email && <div className="text-gray-700 text-xs">{user.email}</div>}
-                      {user.soDienThoai && <div className="text-gray-500 text-xs">{user.soDienThoai}</div>}
-                      {!user.email && !user.soDienThoai && <span className="text-gray-400 text-xs">-</span>}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="text-gray-800 text-xs">{user.donVi || '-'}</div>
-                      <div className="text-gray-500 text-xs">{user.chucVu || ''}</div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span
-                        className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                          user.maVaiTro === 1
-                            ? 'bg-purple-100 text-purple-800'
-                            : user.maVaiTro === 2
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-emerald-100 text-emerald-800'
-                        }`}
-                      >
-                        {user.tenVaiTro}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                          user.trangThai === 'HoatDong'
-                            ? 'bg-green-100 text-green-700'
-                            : user.trangThai === 'KhoaTam'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-red-100 text-red-700'
-                        }`}
-                      >
-                        {user.trangThai === 'HoatDong'
-                          ? 'Hoạt động'
-                          : user.trangThai === 'KhoaTam'
-                          ? 'Khóa tạm'
-                          : 'Bị khóa'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button
-                          onClick={() => handleOpenEditModal(user)}
-                          className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition"
-                          title="Sửa thông tin"
-                        >
-                          Sửa
-                        </button>
-                        <button
-                          onClick={() => handleToggleStatus(user)}
-                          className={`px-2 py-1 text-xs rounded transition ${
-                            user.trangThai === 'HoatDong'
-                              ? 'bg-amber-100 hover:bg-amber-200 text-amber-800'
-                              : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800'
-                          }`}
-                          title={user.trangThai === 'HoatDong' ? 'Khóa tài khoản' : 'Mở khóa'}
-                        >
-                          {user.trangThai === 'HoatDong' ? 'Khóa' : 'Mở'}
-                        </button>
-                        <button
-                          onClick={() => handleOpenResetModal(user)}
-                          className="px-2 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 rounded transition"
-                          title="Đặt lại mật khẩu"
-                        >
-                          Mật khẩu
-                        </button>
-                        {isAdmin && user.maTaiKhoan !== currentUser?.maTaiKhoan && (
-                          <button
-                            onClick={() => handleDeleteUser(user)}
-                            className="px-2 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-600 rounded transition"
-                            title="Xóa tài khoản"
-                          >
-                            Xóa
-                          </button>
-                        )}
-                      </div>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-gray-500">
+                      Đang tải danh sách tài khoản...
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Phân trang */}
-        <div className="flex items-center justify-between p-4 border-t text-sm text-gray-600">
-          <div>
-            Hiển thị <strong>{users.length}</strong> / <strong>{totalCount}</strong> tài khoản
+                ) : users.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-gray-500">
+                      Không tìm thấy tài khoản nào phù hợp với bộ lọc.
+                    </td>
+                  </tr>
+                ) : (
+                  users.map((user) => (
+                    <tr key={user.maTaiKhoan} className="hover:bg-gray-50 transition">
+                      <td className="py-3 px-4 text-gray-500 font-mono">#{user.maTaiKhoan}</td>
+                      <td className="py-3 px-4">
+                        <div className="font-semibold text-gray-900">{user.tenDangNhap}</div>
+                        <div className="text-gray-600 text-xs">{user.hoTen}</div>
+                        {user.cccd && (
+                          <div className="text-gray-400 text-xs">CCCD: {user.cccd}</div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        {user.email && <div className="text-gray-700 text-xs">{user.email}</div>}
+                        {user.soDienThoai && <div className="text-gray-500 text-xs">{user.soDienThoai}</div>}
+                        {!user.email && !user.soDienThoai && <span className="text-gray-400 text-xs">-</span>}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="text-gray-800 text-xs">{user.donVi || '-'}</div>
+                        <div className="text-gray-500 text-xs">{user.chucVu || ''}</div>
+                      </td>
+                      <td className="py-3 px-4">
+                        {getRoleBadge(user)}
+                      </td>
+                      <td className="py-3 px-4">
+                        {getStatusBadge(user.trangThai)}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => handleOpenEditModal(user)}
+                            className="px-2.5 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition font-medium"
+                            title="Sửa thông tin"
+                          >
+                            Sửa
+                          </button>
+                          {isAdmin && (
+                            <button
+                              onClick={() => handleOpenRoleModal(user)}
+                              className="px-2.5 py-1 text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 rounded transition font-medium"
+                              title="Gán / Đổi vai trò"
+                            >
+                              Đổi Role
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleToggleStatus(user)}
+                            className={`px-2.5 py-1 text-xs rounded transition font-medium ${
+                              user.trangThai === 'HoatDong'
+                                ? 'bg-amber-100 hover:bg-amber-200 text-amber-800'
+                                : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800'
+                            }`}
+                            title={user.trangThai === 'HoatDong' ? 'Khóa tài khoản' : 'Mở khóa'}
+                          >
+                            {user.trangThai === 'HoatDong' ? 'Khóa' : 'Mở'}
+                          </button>
+                          <button
+                            onClick={() => handleOpenResetModal(user)}
+                            className="px-2.5 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 rounded transition font-medium"
+                            title="Đặt lại mật khẩu"
+                          >
+                            Đổi MK
+                          </button>
+                          {isAdmin && user.maTaiKhoan !== currentUser?.maTaiKhoan && (
+                            <button
+                              onClick={() => handleDeleteUser(user)}
+                              className="px-2.5 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-600 rounded transition font-medium"
+                              title="Xóa tài khoản"
+                            >
+                              Xóa
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => handlePageChange((filters.pageIndex || 1) - 1)}
-              disabled={(filters.pageIndex || 1) <= 1 || loading}
-              className="px-3 py-1 border rounded disabled:opacity-40 hover:bg-gray-50"
-            >
-              Trước
-            </button>
-            <span>
-              Trang <strong>{filters.pageIndex || 1}</strong> / <strong>{totalPages}</strong>
-            </span>
-            <button
-              onClick={() => handlePageChange((filters.pageIndex || 1) + 1)}
-              disabled={(filters.pageIndex || 1) >= totalPages || loading}
-              className="px-3 py-1 border rounded disabled:opacity-40 hover:bg-gray-50"
-            >
-              Sau
-            </button>
+
+          {/* Pagination Bar */}
+          <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-3 bg-gray-50 border-t">
+            <div className="text-xs text-gray-500 mb-2 sm:mb-0">
+              Tổng số <span className="font-semibold text-gray-700">{totalCount}</span> tài khoản | Trang{' '}
+              <span className="font-semibold text-gray-700">{filters.pageIndex}</span> / {totalPages}
+            </div>
+            <div className="flex gap-1">
+              <button
+                onClick={() => handlePageChange((filters.pageIndex || 1) - 1)}
+                disabled={(filters.pageIndex || 1) <= 1 || loading}
+                className="px-3 py-1 border rounded text-xs disabled:opacity-50 hover:bg-gray-100 transition"
+              >
+                Trang trước
+              </button>
+              <button
+                onClick={() => handlePageChange((filters.pageIndex || 1) + 1)}
+                disabled={(filters.pageIndex || 1) >= totalPages || loading}
+                className="px-3 py-1 border rounded text-xs disabled:opacity-50 hover:bg-gray-100 transition"
+              >
+                Trang tiếp
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Modal Thêm mới / Cập nhật */}
+      {/* Modal Thêm / Sửa tài khoản */}
       <UserModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -334,43 +396,121 @@ export const UserManagement: React.FC = () => {
       />
 
       {/* Modal Đặt lại mật khẩu */}
-      {resetModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-sm w-full p-6 shadow-xl">
-            <h3 className="text-lg font-bold mb-2 text-gray-800">
-              Đặt lại mật khẩu cho {resettingUser?.tenDangNhap}
+      {resetModalOpen && resettingUser && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6 shadow-xl">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">
+              Đặt lại mật khẩu cho tài khoản
             </h3>
-            <p className="text-xs text-gray-500 mb-4">
-              Nhập mật khẩu mới cho người dùng này. Mật khẩu phải có tối thiểu 6 ký tự.
+            <p className="text-sm text-gray-600 mb-4 font-mono">
+              Tài khoản: <span className="font-semibold text-blue-600">{resettingUser.tenDangNhap}</span> ({resettingUser.hoTen})
             </p>
+
             <form onSubmit={handleConfirmResetPassword} className="space-y-4">
               <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">
+                  Mật khẩu mới <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="password"
                   required
-                  minLength={6}
+                  placeholder="Tối thiểu 6 ký tự"
+                  className="w-full px-3 py-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Nhập mật khẩu mới..."
-                  className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              <div className="flex justify-end gap-2">
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">
+                  Xác nhận mật khẩu mới <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Nhập lại mật khẩu mới"
+                  className="w-full px-3 py-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setResetModalOpen(false)}
-                  className="px-3 py-1.5 border rounded text-sm text-gray-600 hover:bg-gray-100"
+                  className="px-4 py-2 border rounded-md text-sm text-gray-700 hover:bg-gray-100"
+                  disabled={resetSubmitting}
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                  disabled={resetSubmitting}
                 >
-                  Xác nhận đổi
+                  {resetSubmitting ? 'Đang cập nhật...' : 'Xác nhận đổi mật khẩu'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Gán / Đổi Vai Trò Nhanh */}
+      {roleModalOpen && roleAssigningUser && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6 shadow-xl">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">
+              Gán / Đổi vai trò tài khoản
+            </h3>
+            <p className="text-sm text-gray-600 mb-4 font-mono">
+              Tài khoản: <span className="font-semibold text-blue-600">{roleAssigningUser.tenDangNhap}</span> ({roleAssigningUser.hoTen})
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">
+                  Vai trò mới cần gán <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={newSelectedRoleId}
+                  onChange={(e) => setNewSelectedRoleId(Number(e.target.value))}
+                  className="w-full px-3 py-2 border rounded-md text-sm bg-white focus:ring-2 focus:ring-purple-500"
+                >
+                  {SYSTEM_ROLES.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      [{r.code}] - {r.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {roleAssigningUser.maTaiKhoan === currentUser?.maTaiKhoan && roleAssigningUser.maVaiTro === 1 && (
+                <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-md">
+                  ⚠️ Lưu ý: Bạn đang thao tác trên tài khoản của chính mình. Quy tắc an ninh không cho phép Quản trị viên tự hạ quyền thành tài khoản thường.
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setRoleModalOpen(false)}
+                  className="px-4 py-2 border rounded-md text-sm text-gray-700 hover:bg-gray-100"
+                  disabled={roleSubmitting}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAssignRoleSubmit}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700 disabled:opacity-50"
+                  disabled={roleSubmitting}
+                >
+                  {roleSubmitting ? 'Đang xử lý...' : 'Xác nhận gán vai trò'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

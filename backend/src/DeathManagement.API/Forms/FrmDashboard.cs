@@ -1,4 +1,5 @@
 using System.Drawing.Drawing2D;
+using DeathManagement.API.Common;
 using DeathManagement.API.Data;
 using DeathManagement.API.Security;
 using Microsoft.EntityFrameworkCore;
@@ -151,6 +152,10 @@ public class FrmDashboard : Form
         var laAdmin = AccessControl.Can(ResourceAccount, ActionView);
         mnuQuanTri.Visible = laAdmin;
 
+        var isCitizen = tk != null && (
+            tk.TenVaiTro.Contains("Người dân", StringComparison.OrdinalIgnoreCase) ||
+            tk.TenVaiTro.Contains("NGUOI_DAN", StringComparison.OrdinalIgnoreCase));
+
         var mnuNghiepVu = new ToolStripMenuItem("📋 QUẢN LÝ HỒ SƠ");
         var mnuTinBao = new ToolStripMenuItem("Tiếp nhận tin báo sự việc...", null, (s, e) =>
         {
@@ -182,16 +187,20 @@ public class FrmDashboard : Form
         // 3. Main Dashboard Body
         var pnlMainBody = new Panel { Dock = DockStyle.Fill, Padding = new Padding(25), BackColor = UITheme.Bg };
 
-        // Quick Stats Cards Panel
-        var pnlCards = new Panel { Dock = DockStyle.Top, Height = 110, BackColor = Color.Transparent };
-        int cardWidth = 260;
-        int gap = 20;
+        // Thống kê tài khoản & vai trò - CHỈ HIỂN THỊ CHO QUẢN TRỊ VIÊN HỆ THỐNG (ADMIN)
+        // Cán bộ nghiệp vụ và Người dân không hiển thị mục quản trị tài khoản này
+        Panel? pnlCards = null;
+        if (laAdmin)
+        {
+            pnlCards = new Panel { Dock = DockStyle.Top, Height = 110, BackColor = Color.Transparent };
+            int cardWidth = 260;
+            int gap = 20;
 
-        pnlCards.Controls.Add(CreateStatCard("TỔNG TÀI KHOẢN", lblTongUser, "Toàn hệ thống", UITheme.Navy, 0 * (cardWidth + gap)));
-        pnlCards.Controls.Add(CreateStatCard("ĐANG HOẠT ĐỘNG", lblUserHoatDong, "Được phép đăng nhập", UITheme.Green, 1 * (cardWidth + gap)));
-        pnlCards.Controls.Add(CreateStatCard("ĐANG BỊ KHÓA", lblUserKhoa, "Khóa tạm / vô hiệu hóa", UITheme.Red, 2 * (cardWidth + gap)));
-        pnlCards.Controls.Add(CreateStatCard("DANH MỤC VAI TRÒ", lblTongRole, "Cấu hình phân quyền", UITheme.Blue, 3 * (cardWidth + gap)));
-        pnlCards.Visible = laAdmin;   // thống kê tài khoản chỉ dành cho người có quyền ACCOUNT:VIEW
+            pnlCards.Controls.Add(CreateStatCard("TỔNG TÀI KHOẢN", lblTongUser, "Toàn hệ thống", UITheme.Navy, 0 * (cardWidth + gap)));
+            pnlCards.Controls.Add(CreateStatCard("ĐANG HOẠT ĐỘNG", lblUserHoatDong, "Được phép đăng nhập", UITheme.Green, 1 * (cardWidth + gap)));
+            pnlCards.Controls.Add(CreateStatCard("ĐANG BỊ KHÓA", lblUserKhoa, "Khóa tạm / vô hiệu hóa", UITheme.Red, 2 * (cardWidth + gap)));
+            pnlCards.Controls.Add(CreateStatCard("DANH MỤC VAI TRÒ", lblTongRole, "Cấu hình phân quyền", UITheme.Blue, 3 * (cardWidth + gap)));
+        }
         // Action Center Panel
         var pnlActionCenter = new Panel
         {
@@ -259,6 +268,16 @@ public class FrmDashboard : Form
             }));
         }
 
+        if (AccessControl.Can(ResourceIncident, ActionCreate))
+        {
+            pnlButtons.Controls.Add(CreateQuickActionButton(isCitizen ? "Khai báo tin báo sự việc / mất tích" : "Tiếp nhận tin báo sự việc", ColorTranslator.FromHtml("#0984e3"), () =>
+            {
+                if (!PermissionUi.Check(this, ResourceIncident, ActionCreate)) return;
+                using var f = new FrmTiepNhanTinBao();
+                f.ShowDialog(this);
+            }));
+        }
+
         if (AccessControl.Can(ResourceMatching, ActionView))
         {
             pnlButtons.Controls.Add(CreateQuickActionButton("Đối chiếu danh tính (AI Matching)", ColorTranslator.FromHtml("#27ae60"), () =>
@@ -272,7 +291,10 @@ public class FrmDashboard : Form
         pnlActionCenter.Controls.Add(pnlButtons);
 
         pnlMainBody.Controls.Add(pnlActionCenter);
-        pnlMainBody.Controls.Add(pnlCards);
+        if (pnlCards != null)
+        {
+            pnlMainBody.Controls.Add(pnlCards);
+        }
 
         // Add All
         Controls.Add(pnlMainBody);

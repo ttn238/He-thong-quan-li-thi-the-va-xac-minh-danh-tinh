@@ -30,18 +30,30 @@ public static class ImageHelper
         };
     }
 
+    public const int MaxAnhMoiTinBao = 5;
+    public const int MaxAnhMoiHoSoMatTich = 6;
+
+    public static readonly HashSet<string> LoaiHopLe = new()
+    {
+        TypeBodyExamination, TypeBodyFace, TypeBodyFull,
+        TypeMissingPortrait, TypeMissingFeatures,
+        TypeIncidentVehicle, TypeIncidentItem, TypeVerificationDna
+    };
+
     /// <summary>
-    /// Chuẩn hóa MIME type từ extension
+    /// Lấy MIME type từ phần mở rộng đã được kiểm tra.
     /// </summary>
     public static string GetMimeType(string fileName)
     {
         var ext = Path.GetExtension(fileName).ToLowerInvariant();
+
         return ext switch
         {
             ".jpg" or ".jpeg" => "image/jpeg",
             ".png" => "image/png",
-            ".webp" => "image/webp",
-            _ => "application/octet-stream"
+            ".bmp" => "image/bmp",
+            _ => throw new InvalidOperationException(
+                "Định dạng ảnh không được hỗ trợ.")
         };
     }
 }
