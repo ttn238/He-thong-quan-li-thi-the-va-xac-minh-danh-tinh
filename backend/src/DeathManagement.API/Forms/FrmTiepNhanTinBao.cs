@@ -1,3 +1,11 @@
+<<<<<<< Updated upstream
+=======
+using DeathManagement.API.DTOs.Image;
+using DeathManagement.API.DTOs.TinBao;
+using DeathManagement.API.Helpers;
+using DeathManagement.API.Services;
+using Microsoft.EntityFrameworkCore;
+>>>>>>> Stashed changes
 namespace DeathManagement.API.Forms;
 
 public class FrmTiepNhanTinBao : Form
@@ -8,7 +16,37 @@ public class FrmTiepNhanTinBao : Form
 
     private readonly ErrorProvider _err = new() { BlinkStyle = ErrorBlinkStyle.NeverBlink };
     private readonly ToolTip _tip = new();
+<<<<<<< Updated upstream
     private string? _anhDuongDan;
+=======
+
+    private static readonly string[] MucDoDb = { "KhanCap", "Cao", "BinhThuong", "Thap" };
+    private int? _maTinBao;                       // có giá trị sau khi tạo tin báo thành công
+    private readonly List<AnhChon> _dsAnh = new();
+    private readonly ImageList _imgThumb = new() { ImageSize = new Size(40, 40), ColorDepth = ColorDepth.Depth32Bit };
+    private readonly ListView lvAnh = new()
+    {
+        Dock = DockStyle.Bottom,
+        Height = 110,
+        View = View.Details,
+        FullRowSelect = true,
+        HideSelection = false,
+        MultiSelect = false,
+        HeaderStyle = ColumnHeaderStyle.None,
+        Font = UITheme.FontRegular(8.5f)
+    };
+
+    private sealed class AnhChon(string duongDan, string ten, long size)
+    {
+        public string DuongDan { get; } = duongDan;
+        public string Ten { get; } = ten;
+        public long Size { get; } = size;
+        public string TrangThai { get; set; } = "Chờ gửi";
+        public long? MaHinhAnh { get; set; }
+    }
+
+    private sealed class LoaiTinBaoItem { public int Ma { get; set; } public string Ten { get; set; } = ""; }
+>>>>>>> Stashed changes
 
     // ---- Khu vực trái: ảnh + AI ----
     private readonly PictureBox picHienTruong = new() { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.FromArgb(30, 30, 30) };

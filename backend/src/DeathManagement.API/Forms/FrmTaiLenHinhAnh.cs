@@ -161,6 +161,13 @@ public class FrmTaiLenHinhAnh : Form
             e.Graphics.DrawRectangle(pen, 0, 0, pnlCard.Width - 1, pnlCard.Height - 1);
         };
 
+<<<<<<< Updated upstream
+=======
+        BatKeoTha(pnlCard);
+        BatKeoTha(picPreview);
+        BatKeoTha(txtDuongDanTep);
+
+>>>>>>> Stashed changes
         // Dòng chọn file
         var lblFile = CreateLabel("TỆP NGUỒN CẦN TẢI LÊN:", 24, 20);
         txtDuongDanTep.Location = new Point(24, 42);
@@ -182,20 +189,35 @@ public class FrmTaiLenHinhAnh : Form
         numMaMatTich.Location = new Point(234, 177);
         numMaMatTich.Size = new Size(190, 30);
 
+<<<<<<< Updated upstream
         chkNhayCam.Location = new Point(24, 220);
 
         var lblMoTa = CreateLabel("MÔ TẢ ĐẶC ĐIỂM HOẶC GHI CHÚ:", 24, 252);
         txtMoTa.Location = new Point(24, 274);
+=======
+        var lblTinBao = CreateLabel("MÃ TIN BÁO (NẾU CÓ):", 24, 220);
+        numMaTinBao.Location = new Point(24, 242);
+        numMaTinBao.Size = new Size(190, 30);
+
+        var lblXacMinh = CreateLabel("MÃ XÁC MINH (NẾU CÓ):", 234, 220);
+        numMaXacMinh.Location = new Point(234, 242);
+        numMaXacMinh.Size = new Size(190, 30);
+
+        chkNhayCam.Location = new Point(24, 282);
+
+        var lblMoTa = CreateLabel("MÔ TẢ ĐẶC ĐIỂM HOẶC GHI CHÚ:", 24, 312);
+        txtMoTa.Location = new Point(24, 334);
+>>>>>>> Stashed changes
         txtMoTa.Size = new Size(580, 60);
 
         // Progress bar
-        prgTienTrinh.Location = new Point(24, 350);
+        prgTienTrinh.Location = new Point(24, 410);
         prgTienTrinh.Size = new Size(580, 16);
-        lblTrangThai.Location = new Point(24, 372);
+        lblTrangThai.Location = new Point(24, 432);
 
         // Buttons
-        btnTaiLen.Location = new Point(344, 410);
-        btnHuy.Location = new Point(514, 410);
+        btnTaiLen.Location = new Point(344, 470);
+        btnHuy.Location = new Point(514, 470);
 
         pnlCard.Controls.AddRange(new Control[]
         {
@@ -223,6 +245,28 @@ public class FrmTaiLenHinhAnh : Form
         AutoSize = true
     };
 
+<<<<<<< Updated upstream
+=======
+    // Bật kéo-thả file ảnh cho một control
+    private void BatKeoTha(Control c)
+    {
+        c.AllowDrop = true;
+        c.DragEnter += (_, e) => e.Effect = e.Data?.GetDataPresent(DataFormats.FileDrop) == true
+            ? DragDropEffects.Copy : DragDropEffects.None;
+        c.DragDrop += (_, e) =>
+        {
+            if (e.Data?.GetData(DataFormats.FileDrop) is not string[] files || files.Length == 0) return;
+            if (files.Length > MaxSoAnh)
+            {
+                MessageBox.Show($"Chỉ được kéo-thả tối đa {MaxSoAnh} ảnh mỗi lần.", "Vượt quá số lượng cho phép",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            XuLyDanhSachAnhKeoTha(files);
+        };
+    }
+
+>>>>>>> Stashed changes
     private void ChonTepDialog()
     {
         using var ofd = new OpenFileDialog
@@ -306,15 +350,124 @@ public class FrmTaiLenHinhAnh : Form
             var service = new ImageService(db);
             ResultImage = await service.TaiLenHinhAnhAsync(req, progress);
 
+<<<<<<< Updated upstream
             lblTrangThai.Text = "Tải lên thành công 100%!";
+=======
+            for (int i = 0; i < tongSoAnh; i++)
+            {
+                int chiSo = i; // bản sao cục bộ để lambda progress không bị lệch khi i tăng
+                string path = _danhSachDuongDanAnh[chiSo];
+                string tenAnh = Path.GetFileName(path);
+
+                lblTrangThai.Text =
+                    $"Đang lưu ảnh {chiSo + 1}/{tongSoAnh}: {tenAnh}";
+
+                try
+                {
+                    // Kiểm tra lại trước từng lần lưu để phát hiện
+                    // tệp đã bị thay đổi sau khi người dùng chọn.
+                    var info = new FileInfo(path);
+
+                    if (!FileHelper.IsValidImageExtension(path)
+                        || !FileHelper.IsValidFileSize(info.Length)
+                        || !FileHelper.IsValidImageContent(path))
+                    {
+                        throw new InvalidOperationException(
+                            "Tệp đã thay đổi hoặc không còn hợp lệ.");
+                    }
+
+                    var req = new UploadImageRequest
+                    {
+                        FilePath = path,
+                        MaTinBao = maTinBao,
+                        MaXacMinh = maXacMinh,
+                        LoaiHinhAnh =
+                            cboLoaiHinhAnh.SelectedItem?.ToString()
+                            ?? "ThiThe_KhamNghiem",
+                        MoTa = txtMoTa.Text.Trim(),
+                        LaNhayCam = chkNhayCam.Checked,
+                        MaHoSoThiThe = maThiThe,
+                        MaHoSoMatTich = maMatTich,
+                        MaTaiKhoanTaiLen = 0
+                    };
+
+                    var progress = new Progress<int>(pct =>
+                    {
+                        int phanTramAnhHienTai = Math.Clamp(pct, 0, 100);
+
+                        int tongPhanTram =
+                            (chiSo * 100 + phanTramAnhHienTai) / tongSoAnh;
+
+                        prgTienTrinh.Value =
+                            Math.Clamp(tongPhanTram, 0, 100);
+
+                        lblTrangThai.Text =
+                            $"Ảnh {chiSo + 1}/{tongSoAnh}: " +
+                            $"{phanTramAnhHienTai}%";
+                    });
+
+                    ImageDto ketQuaAnh =
+                        await service.TaiLenHinhAnhAsync(req, progress);
+
+                    ketQua.Add(ketQuaAnh);
+                    soAnhThanhCong++;
+
+                    prgTienTrinh.Value =
+                        Math.Clamp(soAnhThanhCong * 100 / tongSoAnh, 0, 100);
+                }
+                catch (Exception ex)
+                {
+                    danhSachLoi.Add($"{tenAnh}: {ex.Message}");
+                }
+            }
+
+            ResultImage = ketQua.LastOrDefault();
+
+            // Tất cả ảnh đã lưu: báo thành công và đóng form.
+            if (soAnhThanhCong == tongSoAnh)
+            {
+                lblTrangThai.Text =
+                    $"Hoàn tất: {soAnhThanhCong}/{tongSoAnh} ảnh.";
+
+                MessageBox.Show(
+                    $"Đã tải thành công {soAnhThanhCong} ảnh.",
+                    "Upload thành công",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+
+                DialogResult = DialogResult.OK;
+                Close();
+                return;
+            }
+
+            // Có ảnh lỗi: giữ form mở để người dùng xử lý.
+            lblTrangThai.Text =
+                $"Đã lưu {soAnhThanhCong}/{tongSoAnh} ảnh.";
+
+            string thongBao =
+                $"Đã lưu thành công {soAnhThanhCong}/{tongSoAnh} ảnh.";
+
+            if (danhSachLoi.Count > 0)
+            {
+                thongBao += "\n\nCác ảnh không tải được:\n"
+                    + string.Join("\n", danhSachLoi);
+            }
+
+>>>>>>> Stashed changes
             MessageBox.Show(
                 $"Đã lưu thành công tệp: {ResultImage.TenGoc}\nMã ảnh: #{ResultImage.MaHinhAnh}\nMã băm MD5: {ResultImage.HashMD5}",
                 "Thành công",
                 MessageBoxButtons.OK,
+<<<<<<< Updated upstream
                 MessageBoxIcon.Information);
 
             DialogResult = DialogResult.OK;
             Close();
+=======
+                soAnhThanhCong > 0
+                    ? MessageBoxIcon.Warning
+                    : MessageBoxIcon.Error);
+>>>>>>> Stashed changes
         }
         catch (Exception ex)
         {
@@ -327,4 +480,76 @@ public class FrmTaiLenHinhAnh : Form
             btnHuy.Enabled = true;
         }
     }
+<<<<<<< Updated upstream
 }
+=======
+
+    private void XuLyDanhSachAnhKeoTha(string[] files)
+    {
+        if (files.Length == 0) return;
+
+        foreach (string path in files)
+        {
+            if (!File.Exists(path)
+                || !FileHelper.IsValidImageExtension(path)
+                || !FileHelper.IsValidFileSize(new FileInfo(path).Length)
+                || !FileHelper.IsValidImageContent(path))
+            {
+                MessageBox.Show(
+                    $"Tệp '{Path.GetFileName(path)}' không hợp lệ.\n" +
+                    "Chỉ chấp nhận JPG, JPEG, PNG hoặc BMP, tối đa 10 MB mỗi ảnh.",
+                    "Không thể thêm ảnh",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+        }
+
+        if (!ThemVaoDanhSach(files)) return;
+
+        txtDuongDanTep.Text = _danhSachDuongDanAnh.Count == 1
+            ? _danhSachDuongDanAnh[0]
+            : $"Đã chọn {_danhSachDuongDanAnh.Count}/{MaxSoAnh} ảnh";
+
+        try
+        {
+            using var stream = File.OpenRead(_danhSachDuongDanAnh[0]);
+            using var temp = System.Drawing.Image.FromStream(stream);
+
+            var anhCu = picPreview.Image;
+            picPreview.Image = new Bitmap(temp);
+            anhCu?.Dispose();
+
+            lblTrangThai.Visible = true;
+            lblTrangThai.Text = $"Đã chọn {_danhSachDuongDanAnh.Count}/{MaxSoAnh} ảnh hợp lệ.";
+        }
+        catch (Exception ex)
+        {
+            _danhSachDuongDanAnh.Clear();
+            txtDuongDanTep.Clear();
+
+            MessageBox.Show(
+                "Không thể hiển thị ảnh xem trước: " + ex.Message,
+                "Lỗi ảnh",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+        }
+    }
+
+    private bool ThemVaoDanhSach(IEnumerable<string> files)
+    {
+        var moi = _danhSachDuongDanAnh.ToList();
+        foreach (var p in files)
+            if (!moi.Contains(p, StringComparer.OrdinalIgnoreCase)) moi.Add(p);
+        if (moi.Count > MaxSoAnh)
+        {
+            MessageBox.Show($"Danh sách chỉ được tối đa {MaxSoAnh} ảnh.", "Vượt quá số lượng cho phép",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return false;
+        }
+        _danhSachDuongDanAnh.Clear();
+        _danhSachDuongDanAnh.AddRange(moi);
+        return true;
+    }
+}
+>>>>>>> Stashed changes
