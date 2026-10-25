@@ -9,7 +9,7 @@ namespace DeathManagement.API;
 static class Program
 {
     // Đọc cấu hình từ appsettings.json (phải khai báo TRƯỚC Options vì khởi tạo theo thứ tự)
-    static readonly IConfigurationRoot Config = new ConfigurationBuilder()
+    internal static readonly IConfigurationRoot Config = new ConfigurationBuilder()
         .SetBasePath(AppContext.BaseDirectory)
         .AddJsonFile("appsettings.json")
         .Build();
