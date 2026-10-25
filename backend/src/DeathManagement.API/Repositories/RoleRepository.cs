@@ -4,7 +4,6 @@ using DeathManagement.API.DTOs.Role;
 using DeathManagement.API.Entities;
 using DeathManagement.API.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 
 namespace DeathManagement.API.Repositories;
 
@@ -15,9 +14,9 @@ public class RoleRepository : IRoleRepository
 {
     private readonly ApplicationDbContext _db;
 
-    public RoleRepository(ApplicationDbContext db)
+    public RoleRepository(ApplicationDbContext? db = null)
     {
-        _db = db;
+        _db = db ?? Program.NewDb();
     }
 
     /// <summary>
@@ -35,8 +34,8 @@ public class RoleRepository : IRoleRepository
         {
             MaVaiTro = r.MaVaiTro,
             TenVaiTro = r.TenVaiTro,
-            MaCode = !string.IsNullOrEmpty(r.MaCode) ? r.MaCode : RoleConstants.GetCode(r.MaVaiTro),
-            MoTa = !string.IsNullOrEmpty(r.MoTa) ? r.MoTa : GetRoleDescription(r.MaCode),
+            MaCode = RoleConstants.GetCode(r.MaVaiTro),
+            MoTa = GetRoleDescription(r.MaVaiTro),
             UserCount = r.Users.Count
         }).ToList();
     }
@@ -55,14 +54,12 @@ public class RoleRepository : IRoleRepository
 
         if (role == null) return null;
 
-        var code = !string.IsNullOrEmpty(role.MaCode) ? role.MaCode : RoleConstants.GetCode(role.MaVaiTro);
-
         return new RoleDto
         {
             MaVaiTro = role.MaVaiTro,
             TenVaiTro = role.TenVaiTro,
-            MaCode = code,
-            MoTa = !string.IsNullOrEmpty(role.MoTa) ? role.MoTa : GetRoleDescription(code),
+            MaCode = RoleConstants.GetCode(role.MaVaiTro),
+            MoTa = GetRoleDescription(role.MaVaiTro),
             UserCount = role.Users.Count,
             Permissions = role.RolePermissions.Select(rp => new PermissionDto
             {
@@ -75,6 +72,9 @@ public class RoleRepository : IRoleRepository
         };
     }
 
+    /// <summary>
+    /// Lấy danh mục toàn bộ quyền hệ thống trong bảng QuyenHeThong.
+    /// </summary>
     public async Task<List<PermissionDto>> GetAllPermissionsAsync()
     {
         var permissions = await _db.Permissions
@@ -92,16 +92,17 @@ public class RoleRepository : IRoleRepository
         }).ToList();
     }
 
+    /// <summary>
+    /// Kiểm tra vai trò có tồn tại trong CSDL hay không.
+    /// </summary>
     public async Task<bool> RoleExistsAsync(int roleId)
     {
-        return await _db.Roles.AnyAsync(r => r.MaVaiTro == roleId && r.TrangThai);
+        return await _db.Roles.AnyAsync(r => r.MaVaiTro == roleId);
     }
 
-    public async Task<Role?> GetRoleByIdAsync(int roleId)
-    {
-        return await _db.Roles.FirstOrDefaultAsync(r => r.MaVaiTro == roleId);
-    }
-
+    /// <summary>
+    /// Lấy thông tin tài khoản kèm thông tin vai trò hiện tại.
+    /// </summary>
     public async Task<User?> GetUserWithRoleAsync(long userId)
     {
         return await _db.Users
@@ -109,6 +110,9 @@ public class RoleRepository : IRoleRepository
             .FirstOrDefaultAsync(u => u.MaTaiKhoan == userId);
     }
 
+    /// <summary>
+    /// Cập nhật vai trò mới cho tài khoản.
+    /// </summary>
     public async Task<bool> AssignRoleAsync(long userId, int roleId)
     {
         var user = await _db.Users.FirstOrDefaultAsync(u => u.MaTaiKhoan == userId);
@@ -121,21 +125,18 @@ public class RoleRepository : IRoleRepository
         return true;
     }
 
+    /// <summary>
+    /// Đếm số lượng tài khoản Quản trị viên (ADMIN) đang ở trạng thái HoatDong.
+    /// </summary>
     public async Task<int> CountActiveAdminsAsync()
     {
         return await _db.Users
-            .Include(u => u.Role)
-            .CountAsync(u => (u.Role != null && u.Role.MaCode == RoleConstants.Admin) && u.TrangThai == "HoatDong");
+            .CountAsync(u => u.MaVaiTro == RoleConstants.AdminId && u.TrangThai == "HoatDong");
     }
 
-    public async Task<List<int>> GetExistingPermissionIdsAsync(IEnumerable<int> permissionIds)
-    {
-        return await _db.Permissions
-            .Where(p => permissionIds.Contains(p.MaQuyen))
-            .Select(p => p.MaQuyen)
-            .ToListAsync();
-    }
-
+    /// <summary>
+    /// Cập nhật ma trận quyền hạn cho một vai trò.
+    /// </summary>
     public async Task<bool> UpdateRolePermissionsAsync(int roleId, List<RolePermissionItemRequest> permissions)
     {
         var existing = await _db.RolePermissions.Where(rp => rp.MaVaiTro == roleId).ToListAsync();
@@ -155,31 +156,16 @@ public class RoleRepository : IRoleRepository
         return true;
     }
 
-    public async Task<IDbContextTransaction> BeginTransactionAsync()
+    /// <summary>
+    /// Mô tả chi tiết chức năng và thẩm quyền cho từng vai trò.
+    /// </summary>
+    private static string GetRoleDescription(int roleId) => roleId switch
     {
-        return await _db.Database.BeginTransactionAsync();
-    }
-
-    public async Task WriteAuditLogAsync(string action, string detail, long? actorId)
-    {
-        try
-        {
-            var truncated = detail.Length > 255 ? detail[..255] : detail;
-            await _db.Database.ExecuteSqlInterpolatedAsync($"EXEC sp_GhiNhatKy {action}, {truncated}, {actorId}");
-        }
-        catch
-        {
-            // Tránh ngắt quãng luồng chính nếu thủ tục ghi log không khả dụng trong môi trường test
-        }
-    }
-
-    private static string GetRoleDescription(string? code) => code switch
-    {
-        RoleConstants.Admin => "Toàn quyền quản trị hệ thống, tài khoản và phân quyền người dùng",
-        RoleConstants.Officer => "Tiếp nhận hồ sơ, tìm kiếm tử thi, đối soát ADN và điều tra thông tin",
-        RoleConstants.Approver => "Thẩm quyền phê duyệt chính thức kết luận định danh và bàn giao",
-        RoleConstants.Morgue => "Quản lý vị trí lưu giữ tử thi, tiếp nhận bảo quản và bàn giao",
-        RoleConstants.Citizen => "Khai báo người thân mất tích và theo dõi hồ sơ cá nhân",
+        RoleConstants.AdminId => "Toàn quyền quản trị hệ thống, tài khoản và phân quyền người dùng",
+        RoleConstants.OfficerId => "Tiếp nhận hồ sơ, tìm kiếm tử thi, đối soát ADN và điều tra thông tin",
+        RoleConstants.ApproverId => "Thẩm quyền phê duyệt chính thức kết luận định danh và bàn giao",
+        RoleConstants.MorgueId => "Quản lý vị trí lưu giữ tử thi, tiếp nhận bảo quản và bàn giao",
+        RoleConstants.CitizenId => "Khai báo người thân mất tích và theo dõi hồ sơ cá nhân",
         _ => "Vai trò hệ thống"
     };
 }

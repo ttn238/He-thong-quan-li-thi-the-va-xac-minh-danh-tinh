@@ -19,26 +19,18 @@ GO
     10. Lịch sử đăng nhập, Thông báo và Nhật ký hệ thống mẫu
    ========================================================================= */
 
-/* 1. VAI TRÒ (Seed an toàn theo MaCode không trùng lặp) */
-DECLARE @VaiTro TABLE (MaCode VARCHAR(50) PRIMARY KEY, TenVaiTro NVARCHAR(100), MoTa NVARCHAR(255));
-INSERT @VaiTro (MaCode, TenVaiTro, MoTa) VALUES
- ('ADMIN',         N'Quản trị hệ thống',            N'Quản trị toàn bộ hệ thống và phân quyền'),
- ('CONG_AN',       N'Công an / cán bộ xác minh',    N'Cán bộ công an tiếp nhận tin báo và xác minh hồ sơ'),
- ('CONG_AN_DUYET', N'Công an có thẩm quyền duyệt',  N'Lãnh đạo công an có thẩm quyền phê duyệt'),
- ('NHA_XAC',       N'Nhân viên nhà xác',            N'Nhân viên tiếp nhận và bàn giao thi thể'),
- ('NGUOI_DAN',     N'Người dân / người thân',       N'Người dân khai báo tin báo');
+/* 1. VAI TRÒ */
+DECLARE @VaiTro TABLE (Ma VARCHAR(20) PRIMARY KEY, Ten NVARCHAR(100));
+INSERT @VaiTro (Ma, Ten) VALUES
+ ('ADMIN',         N'Quản trị hệ thống'),
+ ('CONG_AN',       N'Công an / cán bộ xác minh'),
+ ('CONG_AN_DUYET', N'Công an có thẩm quyền duyệt'),
+ ('NHA_XAC',       N'Nhân viên nhà xác'),
+ ('NGUOI_DAN',     N'Người dân / người thân');
 
-UPDATE r
-SET r.MaCode = v.MaCode,
-    r.TenVaiTro = v.TenVaiTro,
-    r.MoTa = v.MoTa
-FROM dbo.VaiTro r
-JOIN @VaiTro v ON r.TenVaiTro = v.TenVaiTro OR r.MaCode = v.MaCode;
-
-INSERT INTO dbo.VaiTro (MaCode, TenVaiTro, MoTa, TrangThai, NgayTao)
-SELECT v.MaCode, v.TenVaiTro, v.MoTa, 1, SYSUTCDATETIME()
-FROM @VaiTro v
-WHERE NOT EXISTS (SELECT 1 FROM dbo.VaiTro WHERE MaCode = v.MaCode);
+INSERT dbo.VaiTro (TenVaiTro) 
+SELECT Ten FROM @VaiTro
+WHERE Ten NOT IN (SELECT TenVaiTro FROM dbo.VaiTro);
 
 /* 2. QUYỀN HỆ THỐNG (Resource x Action) */
 DECLARE @Quyen TABLE (Resource VARCHAR(80), [Action] VARCHAR(30));
@@ -110,7 +102,8 @@ FROM (VALUES
  ('NGUOI_DAN','MISSING_PERSON','VIEW','OWN'),('NGUOI_DAN','MISSING_PERSON','CREATE','OWN'),
  ('NGUOI_DAN','MISSING_PERSON','UPDATE','OWN')
 ) AS v (Ma, Resource, [Action], PhamVi)
-JOIN dbo.VaiTro r ON r.MaCode = v.Ma
+JOIN @VaiTro m          ON m.Ma = v.Ma
+JOIN dbo.VaiTro r       ON r.TenVaiTro = m.Ten
 JOIN dbo.QuyenHeThong q ON q.Resource = v.Resource AND q.[Action] = v.[Action]
 WHERE NOT EXISTS (
     SELECT 1 FROM dbo.VaiTro_Quyen vq 
@@ -119,8 +112,8 @@ WHERE NOT EXISTS (
 
 -- CONG_AN_DUYET = toan bo quyen cua CONG_AN + quyen duyet ket luan danh tinh
 DECLARE @CongAn INT, @CongAnDuyet INT;
-SELECT @CongAn = MaVaiTro FROM dbo.VaiTro WHERE MaCode = 'CONG_AN';
-SELECT @CongAnDuyet = MaVaiTro FROM dbo.VaiTro WHERE MaCode = 'CONG_AN_DUYET';
+SELECT @CongAn      = r.MaVaiTro FROM dbo.VaiTro r JOIN @VaiTro m ON m.Ten = r.TenVaiTro WHERE m.Ma = 'CONG_AN';
+SELECT @CongAnDuyet = r.MaVaiTro FROM dbo.VaiTro r JOIN @VaiTro m ON m.Ten = r.TenVaiTro WHERE m.Ma = 'CONG_AN_DUYET';
 
 INSERT dbo.VaiTro_Quyen (MaVaiTro, MaQuyen, PhamVi)
 SELECT @CongAnDuyet, MaQuyen, PhamVi FROM dbo.VaiTro_Quyen WHERE MaVaiTro = @CongAn
@@ -166,7 +159,8 @@ FROM (VALUES
  ('dan01',    'dan01@demo.local',    '0900000005', '001090000005', N'Phạm Thị Duyên',         NULL,                          NULL,                   'NGUOI_DAN'),
  ('dan02',    'dan02@demo.local',    '0900000006', '001090000006', N'Hoàng Văn Em',           NULL,                          NULL,                   'NGUOI_DAN')
 ) AS v (TenDangNhap, Email, SDT, CCCD, HoTen, DonVi, ChucVu, Ma)
-JOIN dbo.VaiTro r ON r.MaCode = v.Ma;
+JOIN @VaiTro m    ON m.Ma = v.Ma
+JOIN dbo.VaiTro r ON r.TenVaiTro = m.Ten;
 
 -- HO SO NGUOI MAT TICH --
 INSERT INTO HoSoNguoiMatTich (MaNguoiDung, HoTen, GioiTinh, Tuoi, ChieuCao, DacDiemNhanDang, Seo, HinhXam,

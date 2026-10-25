@@ -1,21 +1,6 @@
-// API client with JWT interceptor, Vite env support, and unified auth storage
+// Axios or native fetch based API client with JWT interceptor and error handling
 
-export class ApiError extends Error {
-  public status?: number;
-  public data?: any;
-  constructor(message: string, status?: number, data?: any) {
-    super(message);
-    this.name = 'ApiError';
-    this.status = status;
-    this.data = data;
-  }
-}
-
-const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:5103/api/v1';
-
-export const AUTH_TOKEN_KEY = 'access_token';
-export const AUTH_USER_KEY = 'current_user';
-export const AUTH_SESSION_KEY = 'qltldt.session';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://localhost:7196/api/v1';
 
 export interface ApiResponse<T = any> {
   data?: T;
@@ -24,22 +9,8 @@ export interface ApiResponse<T = any> {
 }
 
 export class ApiClient {
-  public static getToken(): string | null {
-    return localStorage.getItem(AUTH_TOKEN_KEY) || sessionStorage.getItem(AUTH_TOKEN_KEY);
-  }
-
-  public static setToken(token: string): void {
-    localStorage.setItem(AUTH_TOKEN_KEY, token);
-    sessionStorage.setItem(AUTH_TOKEN_KEY, token);
-  }
-
-  public static clearAuth(): void {
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-    localStorage.removeItem(AUTH_USER_KEY);
-    localStorage.removeItem(AUTH_SESSION_KEY);
-    sessionStorage.removeItem(AUTH_TOKEN_KEY);
-    sessionStorage.removeItem(AUTH_USER_KEY);
-    sessionStorage.removeItem(AUTH_SESSION_KEY);
+  private static getToken(): string | null {
+    return localStorage.getItem('access_token');
   }
 
   public static async request<T = any>(
@@ -65,13 +36,14 @@ export class ApiClient {
     });
 
     if (response.status === 401) {
-      this.clearAuth();
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('current_user');
       window.dispatchEvent(new Event('auth:unauthorized'));
       throw new Error('Phiên đăng nhập đã hết hạn hoặc không hợp lệ.');
     }
 
     if (response.status === 403) {
-      throw new Error('Bạn không có quyền thực hiện thao tác này (Yêu cầu vai trò Quản trị viên).');
+      throw new Error('Bạn không có quyền thực hiện thao tác này.');
     }
 
     if (!response.ok) {
@@ -84,11 +56,13 @@ export class ApiClient {
           errorMessage = errorData.title;
         }
       } catch {
+        // Fallback to status text
         if (response.statusText) errorMessage = response.statusText;
       }
       throw new Error(errorMessage);
     }
 
+    // Check if response has content
     const contentLength = response.headers.get('content-length');
     if (contentLength === '0' || response.status === 204) {
       return {} as T;
@@ -132,18 +106,5 @@ export class ApiClient {
     return this.request<T>(endpoint, { method: 'DELETE' });
   }
 }
-
-// Function exports matching import statements in other files
-export const get = <T = any>(endpoint: string, params?: Record<string, any>): Promise<T> =>
-  ApiClient.get<T>(endpoint, params);
-
-export const post = <T = any>(endpoint: string, data?: any): Promise<T> =>
-  ApiClient.post<T>(endpoint, data);
-
-export const put = <T = any>(endpoint: string, data?: any): Promise<T> =>
-  ApiClient.put<T>(endpoint, data);
-
-export const del = <T = any>(endpoint: string): Promise<T> =>
-  ApiClient.delete<T>(endpoint);
 
 export default ApiClient;

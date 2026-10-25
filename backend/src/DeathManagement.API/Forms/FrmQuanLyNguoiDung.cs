@@ -473,9 +473,7 @@ public class FrmQuanLyNguoiDung : Form
 
         try
         {
-            using var db = Program.NewDb();
-            var roleRepo = new Repositories.RoleRepository(db);
-            var roleService = new RoleService(roleRepo);
+            var roleService = new RoleService();
             await roleService.AssignRoleAsync(curId ?? 0, new DTOs.Role.AssignRoleRequest
             {
                 MaTaiKhoan = u.MaTaiKhoan,
@@ -485,6 +483,7 @@ public class FrmQuanLyNguoiDung : Form
             // Ghi vết nhật ký
             try
             {
+                using var db = Program.NewDb();
                 await db.Database.ExecuteSqlInterpolatedAsync($"EXEC sp_GhiNhatKy N'PhanQuyenVaiTro', {u.TenDangNhap}, {curId}");
             }
             catch { }
