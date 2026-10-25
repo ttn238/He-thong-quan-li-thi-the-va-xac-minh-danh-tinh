@@ -1,25 +1,17 @@
-<<<<<<< Updated upstream
-=======
 using DeathManagement.API.DTOs.Image;
 using DeathManagement.API.DTOs.TinBao;
 using DeathManagement.API.Helpers;
 using DeathManagement.API.Services;
 using Microsoft.EntityFrameworkCore;
->>>>>>> Stashed changes
 namespace DeathManagement.API.Forms;
 using DeathManagement.API.Security;
 
 public class FrmTiepNhanTinBao : Form
 {
     private const int MaxMoTa = 2000;
-    private const long MaxAnhBytes = 10 * 1024 * 1024;   // TẠM: giới hạn 10 MB, chờ chốt
-    private static readonly string[] DuoiAnh = { ".jpg", ".jpeg", ".png" };
 
     private readonly ErrorProvider _err = new() { BlinkStyle = ErrorBlinkStyle.NeverBlink };
     private readonly ToolTip _tip = new();
-<<<<<<< Updated upstream
-    private string? _anhDuongDan;
-=======
 
     private static readonly string[] MucDoDb = { "KhanCap", "Cao", "BinhThuong", "Thap" };
     private int? _maTinBao;                       // có giá trị sau khi tạo tin báo thành công
@@ -47,7 +39,6 @@ public class FrmTiepNhanTinBao : Form
     }
 
     private sealed class LoaiTinBaoItem { public int Ma { get; set; } public string Ten { get; set; } = ""; }
->>>>>>> Stashed changes
 
     // ---- Khu vực trái: ảnh + AI ----
     private readonly PictureBox picHienTruong = new() { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.FromArgb(30, 30, 30) };
@@ -84,7 +75,7 @@ public class FrmTiepNhanTinBao : Form
     public FrmTiepNhanTinBao()
     {
         Text = "Hệ Thống Quản Lý Thi Thể & Xác Minh Danh Tính — [Form Tiếp Nhận Tin Báo Sự Việc]";
-        ClientSize = new Size(1020, 640);
+        ClientSize = new Size(1020, 720);
         MinimumSize = new Size(900, 600);
         StartPosition = FormStartPosition.CenterParent;
         BackColor = UITheme.Bg;
@@ -146,12 +137,13 @@ public class FrmTiepNhanTinBao : Form
 
         var gbAnh = TaoGroup("Hình Ảnh Hiện Trường & Phân Tích AI");
         gbAnh.Dock = DockStyle.Top;
-        gbAnh.Height = 340;
+        gbAnh.Height = 420;
         var flowAnh = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 40, WrapContents = false };
         flowAnh.Controls.AddRange(new Control[] { btnChonAnh, btnWebcam, btnXoaAnh });
         gbAnh.Controls.Add(picHienTruong);   // Fill
+        gbAnh.Controls.Add(lvAnh);           // Bottom
         gbAnh.Controls.Add(lblTenAnh);       // Bottom
-        gbAnh.Controls.Add(flowAnh);         // Bottom (sát đáy nhất)
+        gbAnh.Controls.Add(flowAnh);         // Bottom, sát đáy
 
         var gbAi = TaoGroup("Kết Quả Phân Tích AI Tức Thời");
         gbAi.Controls.Add(txtOcr);
@@ -221,11 +213,23 @@ public class FrmTiepNhanTinBao : Form
     // ================= DỮ LIỆU TẠM + SỰ KIỆN =================
     private void NapDuLieuTam()
     {
-        // TẠM: Bước 2 sẽ nạp loại tin báo từ bảng LoaiTinBao trong CSDL
-        cboLoai.Items.AddRange(new object[] { "Tai nạn giao thông", "Phát hiện người tử vong", "Đuối nước", "Cháy nổ", "Khác" });
+        using (var db = Program.NewDb())
+        {
+            var ds = db.Database.SqlQuery<LoaiTinBaoItem>(
+                $"SELECT MaLoaiTinBao AS Ma, TenLoaiTinBao AS Ten FROM LoaiTinBao WHERE TrangThai = 1").ToList();
+            cboLoai.DisplayMember = nameof(LoaiTinBaoItem.Ten);
+            cboLoai.ValueMember = nameof(LoaiTinBaoItem.Ma);
+            cboLoai.DataSource = ds;
+        }
+        lvAnh.SmallImageList = _imgThumb;
+        lvAnh.Columns.Add("Tệp", 190);
+        lvAnh.Columns.Add("MB", 55);
+        lvAnh.Columns.Add("Trạng thái", 120);
+
         // TẠM: danh sách kênh chưa có trong tài liệu/CSDL, chờ bạn chốt
         cboKenh.Items.AddRange(new object[] { "Người dân trực tiếp", "Tổng đài 113 chuyển tiếp", "Cán bộ tại hiện trường" });
         cboKenh.SelectedIndex = 0;
+
         // 4 mức tương ứng CHECK của cột MucDoUuTien (KhanCap, Cao, BinhThuong, Thap)
         cboMucDo.Items.AddRange(new object[] { "CẤP ĐỘ 1 - KHẨN CẤP", "CẤP ĐỘ 2 - CAO", "CẤP ĐỘ 3 - BÌNH THƯỜNG", "CẤP ĐỘ 4 - THẤP" });
         cboMucDo.SelectedIndex = 2;   // mặc định BinhThuong như DEFAULT của cột
@@ -253,66 +257,189 @@ public class FrmTiepNhanTinBao : Form
         btnChonAnh.Click += (s, e) => ChonAnh();
         btnXoaAnh.Click += (s, e) => XoaAnh();
         btnHuy.Click += (s, e) => HuyBo();
-        btnGui.Click += (s, e) => GuiTinBao();
+        btnGui.Click += async (s, e) => await GuiTinBaoAsync();
+        lvAnh.SelectedIndexChanged += (s, e) => XemTruocAnhDangChon();
+        foreach (Control c in new Control[] { picHienTruong, lvAnh }) BatKeoTha(c);
     }
 
     private void CapNhatBoDem() => lblDem.Text = $"Ký tự: {txtMoTa.TextLength} / {MaxMoTa}";
 
     private void ChonAnh()
     {
-        using var dlg = new OpenFileDialog { Title = "Chọn ảnh hiện trường", Filter = "Ảnh (*.jpg;*.jpeg;*.png)|*.jpg;*.jpeg;*.png" };
-        if (dlg.ShowDialog(this) != DialogResult.OK) return;
-
-        var fi = new FileInfo(dlg.FileName);
-        if (!DuoiAnh.Contains(fi.Extension.ToLowerInvariant()))
-        { MessageBox.Show("Chỉ chấp nhận ảnh .jpg, .jpeg, .png.", "Ảnh không hợp lệ", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
-        if (fi.Length > MaxAnhBytes)
-        { MessageBox.Show("Ảnh vượt quá 10 MB.", "Ảnh không hợp lệ", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
-
-        try
+        using var dlg = new OpenFileDialog
         {
-            using var ms = new MemoryStream(File.ReadAllBytes(fi.FullName));
-            using var goc = Image.FromStream(ms);
-            var bmp = new Bitmap(goc);          // sao chép để không khóa file
-            picHienTruong.Image?.Dispose();
-            picHienTruong.Image = bmp;
-            _anhDuongDan = fi.FullName;
-            lblTenAnh.Text = fi.Name;
-            btnXoaAnh.Enabled = true;
-        }
-        catch (Exception ex) when (ex is ArgumentException or OutOfMemoryException or IOException or UnauthorizedAccessException)
+            Title = "Chọn ảnh hiện trường",
+            Filter = "Ảnh (*.jpg;*.jpeg;*.png;*.bmp)|*.jpg;*.jpeg;*.png;*.bmp",
+            Multiselect = true,
+            CheckFileExists = true
+        };
+        if (dlg.ShowDialog(this) == DialogResult.OK) ThemAnh(dlg.FileNames);
+    }
+
+    private void BatKeoTha(Control c)
+    {
+        c.AllowDrop = true;
+        c.DragEnter += (_, e) => e.Effect = e.Data?.GetDataPresent(DataFormats.FileDrop) == true
+            ? DragDropEffects.Copy : DragDropEffects.None;
+        c.DragDrop += (_, e) =>
         {
-            MessageBox.Show("Không đọc được file ảnh: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            if (e.Data?.GetData(DataFormats.FileDrop) is string[] files) ThemAnh(files);
+        };
+    }
+
+    private void ThemAnh(IEnumerable<string> paths)
+    {
+        var loi = new List<string>();
+        foreach (var p in paths)
+        {
+            var fi = new FileInfo(p);
+            if (_dsAnh.Count >= ImageHelper.MaxAnhMoiTinBao) { loi.Add($"{fi.Name}: đã đủ {ImageHelper.MaxAnhMoiTinBao} ảnh."); continue; }
+            if (_dsAnh.Any(a => string.Equals(a.DuongDan, fi.FullName, StringComparison.OrdinalIgnoreCase))) { loi.Add($"{fi.Name}: đã có trong danh sách."); continue; }
+            if (!FileHelper.IsValidImageExtension(p)) { loi.Add($"{fi.Name}: định dạng không được hỗ trợ."); continue; }
+            if (!FileHelper.IsValidFileSize(fi.Length)) { loi.Add($"{fi.Name}: phải lớn hơn 0 và không quá 10 MB."); continue; }
+            if (!FileHelper.IsValidImageContent(p)) { loi.Add($"{fi.Name}: không phải ảnh hợp lệ hoặc bị hỏng."); continue; }
+            _dsAnh.Add(new AnhChon(fi.FullName, fi.Name, fi.Length));
         }
+        VeLaiDanhSachAnh();
+        if (loi.Count > 0)
+            MessageBox.Show(string.Join("\n", loi), "Một số ảnh không được thêm", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+    }
+
+    private static Bitmap TaoThumb(string path)
+    {
+        using var fs = File.OpenRead(path);
+        using var goc = System.Drawing.Image.FromStream(fs);
+        var thumb = new Bitmap(40, 40);
+        using var g = Graphics.FromImage(thumb);
+        g.Clear(Color.White);
+        float tl = Math.Min(40f / goc.Width, 40f / goc.Height);
+        int w = (int)(goc.Width * tl), h = (int)(goc.Height * tl);
+        g.DrawImage(goc, (40 - w) / 2, (40 - h) / 2, w, h);
+        return thumb;
+    }
+
+    private void VeLaiDanhSachAnh()
+    {
+        lvAnh.BeginUpdate();
+        lvAnh.Items.Clear();
+        _imgThumb.Images.Clear();
+        for (int i = 0; i < _dsAnh.Count; i++)
+        {
+            var a = _dsAnh[i];
+            using (var t = TaoThumb(a.DuongDan)) _imgThumb.Images.Add(t);
+            var it = new ListViewItem(a.Ten, i) { Tag = a };
+            it.SubItems.Add($"{a.Size / 1048576.0:F1}");
+            it.SubItems.Add(a.TrangThai);
+            lvAnh.Items.Add(it);
+        }
+        lvAnh.EndUpdate();
+
+        lblTenAnh.Text = _dsAnh.Count == 0
+            ? "Chưa chọn ảnh hiện trường"
+            : $"{_dsAnh.Count}/{ImageHelper.MaxAnhMoiTinBao} ảnh • tổng {_dsAnh.Sum(x => x.Size) / 1048576.0:F1} MB";
+        btnXoaAnh.Enabled = lvAnh.SelectedItems.Count > 0;
+        if (_dsAnh.Count == 0) { picHienTruong.Image?.Dispose(); picHienTruong.Image = null; }
+    }
+
+    private void XemTruocAnhDangChon()
+    {
+        btnXoaAnh.Enabled = lvAnh.SelectedItems.Count > 0;
+        if (lvAnh.SelectedItems.Count == 0) return;
+        var a = (AnhChon)lvAnh.SelectedItems[0].Tag!;
+        using var fs = File.OpenRead(a.DuongDan);
+        using var goc = System.Drawing.Image.FromStream(fs);
+        var bmp = new Bitmap(goc);
+        picHienTruong.Image?.Dispose();
+        picHienTruong.Image = bmp;
     }
 
     private void XoaAnh()
     {
-        picHienTruong.Image?.Dispose();
-        picHienTruong.Image = null;
-        _anhDuongDan = null;
-        lblTenAnh.Text = "Chưa chọn ảnh hiện trường";
-        btnXoaAnh.Enabled = false;
+        if (lvAnh.SelectedItems.Count == 0) return;
+        var a = (AnhChon)lvAnh.SelectedItems[0].Tag!;
+        if (a.MaHinhAnh != null)
+        {
+            MessageBox.Show("Ảnh này đã lưu vào hệ thống nên không xóa ở đây.", "Không thể xóa", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        _dsAnh.Remove(a);
+        VeLaiDanhSachAnh();
     }
 
     private void HuyBo()
     {
-        bool coDuLieu = txtMoTa.TextLength > 0 || txtDiaDiem.TextLength > 0 || _anhDuongDan != null;
+        bool coDuLieu = txtMoTa.TextLength > 0 || txtDiaDiem.TextLength > 0 || _dsAnh.Count > 0;
         if (coDuLieu && MessageBox.Show("Hủy tin báo đang nhập? Dữ liệu chưa lưu sẽ mất.", "Xác nhận",
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
         DialogResult = DialogResult.Cancel;
         Close();
     }
 
-    private void GuiTinBao()
+    private async Task GuiTinBaoAsync()
     {
-        // [PHÂN QUYỀN] Chỉ vai trò có INCIDENT:CREATE (CONG_AN, CONG_AN_DUYET; NGUOI_DAN phạm vi OWN)
         if (!PermissionUi.Check(this, AuthorizationPolicies.ResourceIncident, AuthorizationPolicies.ActionCreate)) return;
         if (!KiemTraDauVao()) return;
-        // Bước 2 sẽ gọi TinBaoService ở đây. Chưa lưu nên KHÔNG báo thành công.
-        // Khi nối DB: NguonTin = vai trò NGUOI_DAN ? "NguoiDan" : "CanBo"; MaTaiKhoanTiepNhan = AccessControl.UserId
-        MessageBox.Show("Dữ liệu hợp lệ. Chức năng lưu vào CSDL chưa được nối nên tin báo CHƯA được gửi.",
-            "Kiểm tra dữ liệu", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+        btnGui.Enabled = false;
+        try
+        {
+            using var db = Program.NewDb();
+
+            if (_maTinBao is null)   // bấm gửi lại để thử lại ảnh lỗi thì không tạo tin báo lần nữa
+            {
+                var diaDiem = txtDiaDiem.Text.Trim();
+                var tieuDe = $"{cboLoai.Text} - {diaDiem}";
+                _maTinBao = await new TinBaoService(db).GuiTinBaoAsync(new GuiTinBaoRequest
+                {
+                    MaLoaiTinBao = (int)cboLoai.SelectedValue!,
+                    TieuDe = tieuDe.Length > 200 ? tieuDe[..200] : tieuDe,
+                    NoiDung = txtMoTa.Text.Trim(),
+                    ThoiGianXayRa = dtpThoiDiem.Value,
+                    DiaDiem = diaDiem,
+                    HoTenNguoiBao = chkAnDanh.Checked || txtHoTen.Text.Trim().Length == 0 ? null : txtHoTen.Text.Trim(),
+                    SoDienThoaiNguoiBao = chkAnDanh.Checked || txtSdt.Text.Trim().Length == 0 ? null : txtSdt.Text.Trim(),
+                    MucDoUuTien = MucDoDb[cboMucDo.SelectedIndex]
+                });
+            }
+
+            var imgSvc = new ImageService(db);
+            int soLoi = 0;
+            foreach (var a in _dsAnh.Where(x => x.MaHinhAnh is null).ToList())
+            {
+                a.TrangThai = "Đang tải lên...";
+                VeLaiDanhSachAnh();
+                try
+                {
+                    var dto = await imgSvc.TaiLenHinhAnhAsync(new UploadImageRequest
+                    {
+                        FilePath = a.DuongDan,
+                        LoaiHinhAnh = ImageHelper.TypeIncidentItem,   // tạm: mọi ảnh hiện trường
+                        MaTinBao = _maTinBao
+                    });
+                    a.MaHinhAnh = dto.MaHinhAnh;
+                    a.TrangThai = "Đã tải lên";
+                }
+                catch (Exception ex) when (ex is not (UnauthenticatedException or ForbiddenException))
+                {
+                    a.TrangThai = "Lỗi: " + ex.Message;
+                    soLoi++;
+                }
+            }
+            VeLaiDanhSachAnh();
+
+            if (soLoi == 0)
+            {
+                MessageBox.Show($"Đã gửi tin báo (mã nội bộ {_maTinBao}).", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                DialogResult = DialogResult.OK;
+                Close();
+            }
+            else
+            {
+                MessageBox.Show($"Tin báo đã được tạo nhưng còn {soLoi} ảnh chưa tải được.\nBấm GỬI TIN BÁO để thử lại các ảnh lỗi.",
+                    "Chưa hoàn tất", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+        finally { btnGui.Enabled = true; }
     }
 
     // ================= KIỂM TRA DỮ LIỆU =================
@@ -355,6 +482,7 @@ public class FrmTiepNhanTinBao : Form
         _tip.Dispose();
         _err.Dispose();
         base.OnFormClosed(e);
+        _imgThumb.Dispose();
     }
 
     private static Button TaoNut(string text, int w, Color back, Color fore)
