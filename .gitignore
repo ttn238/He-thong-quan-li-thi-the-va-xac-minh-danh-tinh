@@ -61,3 +61,6 @@ appsettings.local.json
 uploads/
 private_images/
 App_Data/
+
+ai-service/data/
+ai-service/.venv/

@@ -1,8 +1,10 @@
 using DeathManagement.API.DTOs.Image;
 using DeathManagement.API.DTOs.TinBao;
 using DeathManagement.API.Helpers;
+using Microsoft.EntityFrameworkCore;
 using DeathManagement.API.Services;
 namespace DeathManagement.API.Forms;
+
 using DeathManagement.API.Security;
 
 public class FrmTiepNhanTinBao : Form
@@ -15,8 +17,7 @@ public class FrmTiepNhanTinBao : Form
     private static readonly string[] MucDoDb = { "KhanCap", "Cao", "BinhThuong", "Thap" };
     private int? _maTinBao;                       // có giá trị sau khi tạo tin báo thành công
     private readonly List<AnhChon> _dsAnh = new();
-    private readonly ImageList _imgThumb = new() { ImageSize = new Size(40, 40), ColorDepth = ColorDepth.Color32 };
-    private readonly ListView lvAnh = new()
+    private readonly ImageList _imgThumb = new() { ImageSize = new Size(40, 40), ColorDepth = ColorDepth.Depth32Bit }; private readonly ListView lvAnh = new()
     {
         Dock = DockStyle.Bottom,
         Height = 110,

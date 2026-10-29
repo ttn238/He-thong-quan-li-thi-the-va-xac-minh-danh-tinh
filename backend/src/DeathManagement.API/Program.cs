@@ -23,6 +23,8 @@ static class Program
 
     // Mỗi lần cần truy cập CSDL thì tạo một DbContext mới
     public static ApplicationDbContext NewDb() => new(Options);
+    public static string AiBaseUrl => Config["AiService:BaseUrl"] ?? "http://localhost:8000";
+    public static int AiTimeoutSeconds => int.TryParse(Config["AiService:TimeoutSeconds"], out var s) && s > 0 ? s : 30;
 
     [STAThread]
     static void Main()

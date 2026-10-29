@@ -168,26 +168,8 @@ public class FrmTaiLenHinhAnh : Form
         BatKeoTha(picPreview);
         BatKeoTha(txtDuongDanTep);
 
-        private void BatKeoTha(Control c)
-    {
-        c.AllowDrop = true;
-        c.DragEnter += (_, e) => e.Effect = e.Data?.GetDataPresent(DataFormats.FileDrop) == true
-            ? DragDropEffects.Copy : DragDropEffects.None;
-        c.DragDrop += (_, e) =>
-        {
-            if (e.Data?.GetData(DataFormats.FileDrop) is not string[] files || files.Length == 0) return;
-            if (files.Length > MaxSoAnh)
-            {
-                MessageBox.Show($"Chỉ được kéo-thả tối đa {MaxSoAnh} ảnh mỗi lần.", "Vượt quá số lượng cho phép",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-            XuLyDanhSachAnhKeoTha(files);
-        };
-    }
-
-    // Dòng chọn file
-    var lblFile = CreateLabel("TỆP NGUỒN CẦN TẢI LÊN:", 24, 20);
+        // Dòng chọn file
+        var lblFile = CreateLabel("TỆP NGUỒN CẦN TẢI LÊN:", 24, 20);
         txtDuongDanTep.Location = new Point(24, 42);
         txtDuongDanTep.Size = new Size(460, 32);
         btnChonFile.Location = new Point(494, 40);
@@ -207,30 +189,28 @@ public class FrmTaiLenHinhAnh : Form
         numMaMatTich.Location = new Point(234, 177);
         numMaMatTich.Size = new Size(190, 30);
 
-        chkNhayCam.Location = new Point(24, 220);
-
-        var lblMoTa = CreateLabel("MÔ TẢ ĐẶC ĐIỂM HOẶC GHI CHÚ:", 24, 252);
-        txtMoTa.Location = new Point(24, 274);
-        txtMoTa.Size = new Size(580, 60);
-
         var lblTinBao = CreateLabel("MÃ TIN BÁO (NẾU CÓ):", 24, 220);
-        numMaTinBao.Location = new Point(24, 242); numMaTinBao.Size = new Size(190, 30);
+        numMaTinBao.Location = new Point(24, 242);
+        numMaTinBao.Size = new Size(190, 30);
+
         var lblXacMinh = CreateLabel("MÃ XÁC MINH (NẾU CÓ):", 234, 220);
-        numMaXacMinh.Location = new Point(234, 242); numMaXacMinh.Size = new Size(190, 30);
+        numMaXacMinh.Location = new Point(234, 242);
+        numMaXacMinh.Size = new Size(190, 30);
 
         chkNhayCam.Location = new Point(24, 282);
-        // lblMoTa y: 252 -> 312 ; txtMoTa y: 274 -> 334
-        // prgTienTrinh y: 350 -> 410 ; lblTrangThai y: 372 -> 432
-        // btnTaiLen, btnHuy y: 410 -> 470
+
+        var lblMoTa = CreateLabel("MÔ TẢ ĐẶC ĐIỂM HOẶC GHI CHÚ:", 24, 312);
+        txtMoTa.Location = new Point(24, 334);
+        txtMoTa.Size = new Size(580, 60);
 
         // Progress bar
-        prgTienTrinh.Location = new Point(24, 350);
+        prgTienTrinh.Location = new Point(24, 410);
         prgTienTrinh.Size = new Size(580, 16);
-        lblTrangThai.Location = new Point(24, 372);
+        lblTrangThai.Location = new Point(24, 432);
 
         // Buttons
-        btnTaiLen.Location = new Point(344, 410);
-        btnHuy.Location = new Point(514, 410);
+        btnTaiLen.Location = new Point(344, 470);
+        btnHuy.Location = new Point(514, 470);
 
         pnlCard.Controls.AddRange(new Control[]
         {
@@ -249,6 +229,25 @@ public class FrmTaiLenHinhAnh : Form
 
         Controls.Add(pnlCard);
         Controls.Add(pnlHeader);
+    }
+
+    // Bật kéo-thả cho một control (gọi cho form, panel nền, ô xem trước...)
+    private void BatKeoTha(Control c)
+    {
+        c.AllowDrop = true;
+        c.DragEnter += (_, e) => e.Effect = e.Data?.GetDataPresent(DataFormats.FileDrop) == true
+            ? DragDropEffects.Copy : DragDropEffects.None;
+        c.DragDrop += (_, e) =>
+        {
+            if (e.Data?.GetData(DataFormats.FileDrop) is not string[] files || files.Length == 0) return;
+            if (files.Length > MaxSoAnh)
+            {
+                MessageBox.Show($"Chỉ được kéo-thả tối đa {MaxSoAnh} ảnh mỗi lần.", "Vượt quá số lượng cho phép",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            XuLyDanhSachAnhKeoTha(files);
+        };
     }
 
     private static Label CreateLabel(string text, int x, int y) => new()
@@ -620,15 +619,15 @@ public class FrmTaiLenHinhAnh : Form
             }
         }
 
-        if (!ThemVaoDanhSach(ofd.FileNames)) return;
+        if (!ThemVaoDanhSach(files)) return;
 
-        txtDuongDanTep.Text = files.Length == 1
-            ? files[0]
-            : $"Đã chọn {files.Length}/{MaxSoAnh} ảnh";
+        txtDuongDanTep.Text = _danhSachDuongDanAnh.Count == 1
+            ? _danhSachDuongDanAnh[0]
+            : $"Đã chọn {_danhSachDuongDanAnh.Count}/{MaxSoAnh} ảnh";
 
         try
         {
-            using var stream = File.OpenRead(files[0]);
+            using var stream = File.OpenRead(_danhSachDuongDanAnh[^1]);
             using var temp = System.Drawing.Image.FromStream(stream);
 
             var anhCu = picPreview.Image;
@@ -636,7 +635,7 @@ public class FrmTaiLenHinhAnh : Form
             anhCu?.Dispose();
 
             lblTrangThai.Visible = true;
-            lblTrangThai.Text = $"Đã chọn {files.Length}/{MaxSoAnh} ảnh hợp lệ.";
+            lblTrangThai.Text = $"Đã chọn {_danhSachDuongDanAnh.Count}/{MaxSoAnh} ảnh hợp lệ.";
         }
         catch (Exception ex)
         {

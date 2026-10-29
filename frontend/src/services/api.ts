@@ -1,110 +1,134 @@
-// Axios or native fetch based API client with JWT interceptor and error handling
+// Máy khách HTTP dùng chung. Giữ cả hai cách gọi mà các file khác đang dùng:
+//   - ApiClient.get/post/put/delete   (userService, ...)
+//   - post(...) và ApiError           (authService, Login)
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://localhost:7196/api/v1';
+// Địa chỉ gốc. Mặc định đi qua proxy của Vite (/api -> backend, /ai -> dịch vụ AI).
+// Khi triển khai thật: đặt VITE_API_URL / VITE_AI_API_URL trong .env.production.
+const API_BASE_URL: string = import.meta.env.VITE_API_URL ?? '/api/v1';
+export const AI_API_URL: string = import.meta.env.VITE_AI_API_URL ?? '/ai';
+
+const SESSION_KEY = 'qltldt.session';
 
 export interface ApiResponse<T = any> {
-  data?: T;
-  message?: string;
-  error?: string;
+    data?: T;
+    message?: string;
+    error?: string;
+}
+
+export class ApiError extends Error {
+    constructor(public status: number, message: string) {
+        super(message);
+        this.name = 'ApiError';
+    }
+}
+
+// JWT nằm trong phiên đăng nhập (authService lưu LoginResponse.Token)
+function getToken(): string | null {
+    try {
+        const raw = sessionStorage.getItem(SESSION_KEY);
+        const token = raw ? JSON.parse(raw)?.user?.token : null;
+        if (typeof token === 'string' && token) return token;
+        return localStorage.getItem('access_token');
+    } catch {
+        return null;
+    }
+}
+
+function clearSession(): void {
+    try {
+        sessionStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('current_user');
+    } catch {
+        /* bỏ qua */
+    }
+    window.dispatchEvent(new Event('auth:unauthorized'));
+}
+
+async function readMessage(res: Response): Promise<string> {
+    try {
+        const d = await res.json();
+        if (typeof d?.message === 'string') return d.message;   // backend .NET
+        if (typeof d?.detail === 'string') return d.detail;     // FastAPI
+        if (typeof d?.title === 'string') return d.title;       // ProblemDetails
+    } catch {
+        /* không có JSON */
+    }
+    if (res.status >= 500) return `Máy chủ không phản hồi hoặc đang gặp sự cố (HTTP ${res.status}).`;
+    return res.statusText || `Yêu cầu thất bại (mã lỗi ${res.status}).`;
 }
 
 export class ApiClient {
-  private static getToken(): string | null {
-    return localStorage.getItem('access_token');
-  }
+    public static async request<T = any>(
+        endpoint: string,
+        options: RequestInit = {},
+        baseUrl: string = API_BASE_URL,
+    ): Promise<T> {
+        const token = getToken();
+        const headers: Record<string, string> = {
+            Accept: 'application/json',
+            ...(options.headers as Record<string, string>),
+        };
+        // Gửi file (FormData) thì để trình duyệt tự đặt Content-Type kèm boundary
+        if (!(options.body instanceof FormData)) headers['Content-Type'] = 'application/json';
+        if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  public static async request<T = any>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
-    const token = this.getToken();
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      ...(options.headers as Record<string, string>),
-    };
+        const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`;
 
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
-
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
-
-    if (response.status === 401) {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('current_user');
-      window.dispatchEvent(new Event('auth:unauthorized'));
-      throw new Error('Phiên đăng nhập đã hết hạn hoặc không hợp lệ.');
-    }
-
-    if (response.status === 403) {
-      throw new Error('Bạn không có quyền thực hiện thao tác này.');
-    }
-
-    if (!response.ok) {
-      let errorMessage = `Yêu cầu thất bại với mã lỗi ${response.status}`;
-      try {
-        const errorData = await response.json();
-        if (errorData?.message) {
-          errorMessage = errorData.message;
-        } else if (errorData?.title) {
-          errorMessage = errorData.title;
+        let res: Response;
+        try {
+            res = await fetch(url, { ...options, headers });
+        } catch {
+            throw new ApiError(0, 'Không kết nối được máy chủ.');
         }
-      } catch {
-        // Fallback to status text
-        if (response.statusText) errorMessage = response.statusText;
-      }
-      throw new Error(errorMessage);
-    }
 
-    // Check if response has content
-    const contentLength = response.headers.get('content-length');
-    if (contentLength === '0' || response.status === 204) {
-      return {} as T;
-    }
-
-    return response.json();
-  }
-
-  public static get<T = any>(endpoint: string, params?: Record<string, any>): Promise<T> {
-    let url = endpoint;
-    if (params) {
-      const searchParams = new URLSearchParams();
-      Object.entries(params).forEach(([key, val]) => {
-        if (val !== undefined && val !== null && val !== '') {
-          searchParams.append(key, String(val));
+        if (res.status === 401) {
+            // Đang có phiên mà bị 401 = hết hạn. Đăng nhập sai thì giữ thông báo của máy chủ.
+            if (token && !endpoint.startsWith('/auth/login')) {
+                clearSession();
+                throw new ApiError(401, 'Phiên đăng nhập đã hết hạn hoặc không hợp lệ.');
+            }
+            throw new ApiError(401, await readMessage(res));
         }
-      });
-      const queryString = searchParams.toString();
-      if (queryString) {
-        url += (url.includes('?') ? '&' : '?') + queryString;
-      }
+        if (res.status === 403) throw new ApiError(403, 'Bạn không có quyền thực hiện thao tác này.');
+        if (!res.ok) throw new ApiError(res.status, await readMessage(res));
+
+        if (res.status === 204 || res.headers.get('content-length') === '0') return {} as T;
+        return (await res.json()) as T;
     }
-    return this.request<T>(url, { method: 'GET' });
-  }
 
-  public static post<T = any>(endpoint: string, data?: any): Promise<T> {
-    return this.request<T>(endpoint, {
-      method: 'POST',
-      body: data ? JSON.stringify(data) : undefined,
-    });
-  }
+    public static get<T = any>(endpoint: string, params?: Record<string, any>, baseUrl?: string): Promise<T> {
+        let url = endpoint;
+        if (params) {
+            const sp = new URLSearchParams();
+            Object.entries(params).forEach(([k, v]) => {
+                if (v !== undefined && v !== null && v !== '') sp.append(k, String(v));
+            });
+            const qs = sp.toString();
+            if (qs) url += (url.includes('?') ? '&' : '?') + qs;
+        }
+        return this.request<T>(url, { method: 'GET' }, baseUrl);
+    }
 
-  public static put<T = any>(endpoint: string, data?: any): Promise<T> {
-    return this.request<T>(endpoint, {
-      method: 'PUT',
-      body: data ? JSON.stringify(data) : undefined,
-    });
-  }
+    public static post<T = any>(endpoint: string, data?: unknown, baseUrl?: string): Promise<T> {
+        const body = data === undefined ? undefined : data instanceof FormData ? data : JSON.stringify(data);
+        return this.request<T>(endpoint, { method: 'POST', body }, baseUrl);
+    }
 
-  public static delete<T = any>(endpoint: string): Promise<T> {
-    return this.request<T>(endpoint, { method: 'DELETE' });
-  }
+    public static put<T = any>(endpoint: string, data?: unknown, baseUrl?: string): Promise<T> {
+        const body = data === undefined ? undefined : JSON.stringify(data);
+        return this.request<T>(endpoint, { method: 'PUT', body }, baseUrl);
+    }
+
+    public static delete<T = any>(endpoint: string, baseUrl?: string): Promise<T> {
+        return this.request<T>(endpoint, { method: 'DELETE' }, baseUrl);
+    }
 }
+
+// Dạng hàm rời, authService đang import `post`
+export const get = <T = any>(endpoint: string, params?: Record<string, any>) => ApiClient.get<T>(endpoint, params);
+export const post = <T = any>(endpoint: string, data?: unknown) => ApiClient.post<T>(endpoint, data);
+export const put = <T = any>(endpoint: string, data?: unknown) => ApiClient.put<T>(endpoint, data);
+export const del = <T = any>(endpoint: string) => ApiClient.delete<T>(endpoint);
 
 export default ApiClient;
