@@ -259,6 +259,24 @@ public class FrmTaiLenHinhAnh : Form
         AutoSize = true
     };
 
+    // Bật kéo-thả file ảnh cho một control
+    private void BatKeoTha(Control c)
+    {
+        c.AllowDrop = true;
+        c.DragEnter += (_, e) => e.Effect = e.Data?.GetDataPresent(DataFormats.FileDrop) == true
+            ? DragDropEffects.Copy : DragDropEffects.None;
+        c.DragDrop += (_, e) =>
+        {
+            if (e.Data?.GetData(DataFormats.FileDrop) is not string[] files || files.Length == 0) return;
+            if (files.Length > MaxSoAnh)
+            {
+                MessageBox.Show($"Chỉ được kéo-thả tối đa {MaxSoAnh} ảnh mỗi lần.", "Vượt quá số lượng cho phép",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            XuLyDanhSachAnhKeoTha(files);
+        };
+    }
 
     private void ChonTepDialog()
     {
@@ -361,8 +379,6 @@ public class FrmTaiLenHinhAnh : Form
                 MessageBoxIcon.Warning);
         }
     }
-
-
     private void NapTepDuocChon(string path)
     {
         txtDuongDanTep.Text = path;
@@ -602,6 +618,8 @@ public class FrmTaiLenHinhAnh : Form
 
     private void XuLyDanhSachAnhKeoTha(string[] files)
     {
+        if (files.Length == 0) return;
+
         foreach (string path in files)
         {
             if (!File.Exists(path)
@@ -627,7 +645,7 @@ public class FrmTaiLenHinhAnh : Form
 
         try
         {
-            using var stream = File.OpenRead(_danhSachDuongDanAnh[^1]);
+            using var stream = File.OpenRead(_danhSachDuongDanAnh[0]);
             using var temp = System.Drawing.Image.FromStream(stream);
 
             var anhCu = picPreview.Image;
@@ -640,6 +658,7 @@ public class FrmTaiLenHinhAnh : Form
         catch (Exception ex)
         {
             _danhSachDuongDanAnh.Clear();
+            txtDuongDanTep.Clear();
 
             MessageBox.Show(
                 "Không thể hiển thị ảnh xem trước: " + ex.Message,

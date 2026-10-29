@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using DeathManagement.API.DTOs.User;
+using DeathManagement.API.Services;
 using DeathManagement.API.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,16 +13,16 @@ public class UserController : ControllerBase
 {
     private readonly IUserService _userService;
 
-    public UserController(IUserService userService)
+    public UserController(IUserService? userService = null)
     {
-        _userService = userService;
+        _userService = userService ?? new UserService();
     }
 
     /// <summary>
     /// Lấy danh sách tài khoản có phân trang, tìm kiếm, lọc (Chỉ Quản trị viên).
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = "QuanTriVien")]
+    [Authorize(Roles = "ADMIN,Quản trị hệ thống,QuanTriVien")]
     public async Task<ActionResult<PagedResult<UserDto>>> GetAll([FromQuery] UserFilterRequest filter)
     {
         var result = await _userService.GetPagedListAsync(filter);
@@ -70,7 +71,7 @@ public class UserController : ControllerBase
     /// Lấy thông tin chi tiết một tài khoản theo ID (Chỉ Quản trị viên).
     /// </summary>
     [HttpGet("{id:long}")]
-    [Authorize(Roles = "QuanTriVien")]
+    [Authorize(Roles = "ADMIN,Quản trị hệ thống,QuanTriVien")]
     public async Task<ActionResult<UserDto>> GetById(long id)
     {
         var user = await _userService.GetByIdAsync(id);
@@ -82,9 +83,12 @@ public class UserController : ControllerBase
     /// Tạo mới một tài khoản (Chỉ Quản trị viên).
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "QuanTriVien")]
+    [Authorize(Roles = "ADMIN,Quản trị hệ thống,QuanTriVien")]
     public async Task<ActionResult<UserDto>> Create([FromBody] CreateUserRequest request)
     {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
         try
         {
             var created = await _userService.CreateAsync(request);
@@ -100,9 +104,12 @@ public class UserController : ControllerBase
     /// Cập nhật thông tin tài khoản và phân quyền (Chỉ Quản trị viên).
     /// </summary>
     [HttpPut("{id:long}")]
-    [Authorize(Roles = "QuanTriVien")]
+    [Authorize(Roles = "ADMIN,Quản trị hệ thống,QuanTriVien")]
     public async Task<ActionResult<UserDto>> Update(long id, [FromBody] UpdateUserRequest request)
     {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
         try
         {
             var updated = await _userService.UpdateAsync(id, request);
@@ -119,7 +126,7 @@ public class UserController : ControllerBase
     /// Khóa / Mở khóa trạng thái tài khoản (Chỉ Quản trị viên).
     /// </summary>
     [HttpPut("{id:long}/status")]
-    [Authorize(Roles = "QuanTriVien")]
+    [Authorize(Roles = "ADMIN,Quản trị hệ thống,QuanTriVien")]
     public async Task<IActionResult> ChangeStatus(long id, [FromBody] ChangeUserStatusRequest request)
     {
         var currentUserId = GetCurrentUserId() ?? 0;
@@ -139,20 +146,27 @@ public class UserController : ControllerBase
     /// Đặt lại mật khẩu tài khoản (Chỉ Quản trị viên).
     /// </summary>
     [HttpPut("{id:long}/reset-password")]
-    [Authorize(Roles = "QuanTriVien")]
+    [Authorize(Roles = "ADMIN,Quản trị hệ thống,QuanTriVien")]
     public async Task<IActionResult> ResetPassword(long id, [FromBody] ResetPasswordRequest request)
     {
         var currentUserId = GetCurrentUserId() ?? 0;
-        var success = await _userService.ResetPasswordAsync(currentUserId, id, request);
-        if (!success) return NotFound(new { message = $"Không tìm thấy tài khoản với mã #{id}." });
-        return Ok(new { message = "Đã đặt lại mật khẩu mới cho tài khoản thành công." });
+        try
+        {
+            var success = await _userService.ResetPasswordAsync(currentUserId, id, request);
+            if (!success) return NotFound(new { message = $"Không tìm thấy tài khoản với mã #{id}." });
+            return Ok(new { message = "Đã đặt lại mật khẩu mới cho tài khoản thành công." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     /// <summary>
     /// Xóa tài khoản (Chỉ Quản trị viên).
     /// </summary>
     [HttpDelete("{id:long}")]
-    [Authorize(Roles = "QuanTriVien")]
+    [Authorize(Roles = "ADMIN,Quản trị hệ thống,QuanTriVien")]
     public async Task<IActionResult> Delete(long id)
     {
         var currentUserId = GetCurrentUserId() ?? 0;
@@ -172,7 +186,8 @@ public class UserController : ControllerBase
     {
         var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                  ?? User.FindFirst("sub")?.Value
-                 ?? User.FindFirst("id")?.Value;
+                 ?? User.FindFirst("id")?.Value
+                 ?? User.FindFirst("MaTaiKhoan")?.Value;
 
         return long.TryParse(claim, out var id) ? id : null;
     }

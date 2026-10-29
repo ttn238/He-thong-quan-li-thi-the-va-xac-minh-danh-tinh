@@ -1,7 +1,9 @@
 using System.Data;
+using DeathManagement.API.Common;
 using DeathManagement.API.Data;
 using DeathManagement.API.Entities;
 using DeathManagement.API.Security;
+using DeathManagement.API.Services;
 using Microsoft.EntityFrameworkCore;
 using static DeathManagement.API.Security.AuthorizationPolicies;
 
@@ -45,7 +47,7 @@ public class FrmQuanLyNguoiDung : Form
     {
         AccessControl.Require(ResourceAccount, ActionView);   // chặn từ gốc nếu thiếu quyền
         Text = "Quản lý Người dùng & Phân quyền Tài khoản";
-        ClientSize = new Size(1100, 650);
+        ClientSize = new Size(1120, 680);
         StartPosition = FormStartPosition.CenterScreen;
         BackColor = UITheme.Bg;
         Font = UITheme.FontRegular(9.5f);
@@ -57,14 +59,14 @@ public class FrmQuanLyNguoiDung : Form
     private void BuildUI()
     {
         // 1. Top Header Banner (Đồng bộ Navy & Gold của FrmLogin)
-        var pnlHeader = new Panel { Dock = DockStyle.Top, Height = 60, BackColor = UITheme.Navy };
+        var pnlHeader = new Panel { Dock = DockStyle.Top, Height = 68, BackColor = UITheme.Navy };
         var lblTitle = new Label
         {
             Text = "QUẢN TRỊ TÀI KHOẢN NGƯỜI DÙNG & PHÂN QUYỀN (ACCOUNT & PERMISSION)",
             ForeColor = Color.White,
             Font = UITheme.FontBold(11),
             AutoSize = true,
-            Location = new Point(20, 12)
+            Location = new Point(24, 14)
         };
         var lblSub = new Label
         {
@@ -72,32 +74,41 @@ public class FrmQuanLyNguoiDung : Form
             ForeColor = UITheme.Gold,
             Font = UITheme.FontRegular(8.5f),
             AutoSize = true,
-            Location = new Point(20, 34)
+            Location = new Point(24, 38)
+        };
+        pnlHeader.Paint += (s, e) =>
+        {
+            using var pen = new Pen(UITheme.Gold, 2);
+            e.Graphics.DrawLine(pen, 0, pnlHeader.Height - 1, pnlHeader.Width, pnlHeader.Height - 1);
         };
         pnlHeader.Controls.Add(lblTitle);
         pnlHeader.Controls.Add(lblSub);
 
-        // 2. Toolbar Tìm kiếm & Lọc
-        var pnlFilter = new Panel { Dock = DockStyle.Top, Height = 55, BackColor = Color.White };
+        // Khoảng đệm phân tách giữa Header và Thanh công cụ
+        var pnlSpacer = new Panel { Dock = DockStyle.Top, Height = 12, BackColor = UITheme.Bg };
+
+        // 2. Toolbar Tìm kiếm & Lọc (Tách biệt, thoáng và chuẩn tỷ lệ)
+        var pnlFilter = new Panel { Dock = DockStyle.Top, Height = 62, BackColor = Color.White };
         pnlFilter.Paint += (s, e) =>
         {
             using var pen = new Pen(UITheme.Line);
+            e.Graphics.DrawLine(pen, 0, 0, pnlFilter.Width, 0);
             e.Graphics.DrawLine(pen, 0, pnlFilter.Height - 1, pnlFilter.Width, pnlFilter.Height - 1);
         };
 
-        var lblTim = new Label { Text = "Tìm kiếm:", Location = new Point(20, 18), AutoSize = true, Font = UITheme.FontBold(9) };
-        txtTimKiem.Location = new Point(90, 14);
+        var lblTim = new Label { Text = "Tìm kiếm:", Location = new Point(24, 21), AutoSize = true, Font = UITheme.FontBold(9) };
+        txtTimKiem.Location = new Point(98, 17);
         txtTimKiem.Width = 260;
         txtTimKiem.TextChanged += (s, e) => LoadUsers();
 
-        var lblVT = new Label { Text = "Vai trò:", Location = new Point(370, 18), AutoSize = true, Font = UITheme.FontBold(9) };
-        cboLocVaiTro.Location = new Point(430, 14);
+        var lblVT = new Label { Text = "Vai trò:", Location = new Point(378, 21), AutoSize = true, Font = UITheme.FontBold(9) };
+        cboLocVaiTro.Location = new Point(442, 17);
         cboLocVaiTro.Width = 170;
         cboLocVaiTro.SelectedIndexChanged += (s, e) => LoadUsers();
 
-        var lblTT = new Label { Text = "Trạng thái:", Location = new Point(620, 18), AutoSize = true, Font = UITheme.FontBold(9) };
-        cboLocTrangThai.Location = new Point(700, 14);
-        cboLocTrangThai.Width = 130;
+        var lblTT = new Label { Text = "Trạng thái:", Location = new Point(630, 21), AutoSize = true, Font = UITheme.FontBold(9) };
+        cboLocTrangThai.Location = new Point(712, 17);
+        cboLocTrangThai.Width = 125;
         cboLocTrangThai.Items.AddRange(new object[] { "Tất cả", "HoatDong", "KhoaTam", "Khoa" });
         cboLocTrangThai.SelectedIndex = 0;
         cboLocTrangThai.SelectedIndexChanged += (s, e) => LoadUsers();
@@ -105,8 +116,8 @@ public class FrmQuanLyNguoiDung : Form
         var btnThem = new Button
         {
             Text = "+ THÊM MỚI",
-            Location = new Point(850, 12),
-            Size = new Size(110, 32),
+            Location = new Point(856, 14),
+            Size = new Size(115, 34),
             FlatStyle = FlatStyle.Flat,
             BackColor = UITheme.Navy,
             ForeColor = Color.White,
@@ -129,8 +140,8 @@ public class FrmQuanLyNguoiDung : Form
         var btnLamMoi = new Button
         {
             Text = "LÀM MỚI",
-            Location = new Point(970, 12),
-            Size = new Size(95, 32),
+            Location = new Point(984, 14),
+            Size = new Size(95, 34),
             FlatStyle = FlatStyle.Flat,
             BackColor = Color.White,
             ForeColor = UITheme.Navy,
@@ -238,6 +249,7 @@ public class FrmQuanLyNguoiDung : Form
         Controls.Add(pnlGridContainer);
         Controls.Add(pnlBottom);
         Controls.Add(pnlFilter);
+        Controls.Add(pnlSpacer);
         Controls.Add(pnlHeader);
     }
 
@@ -476,37 +488,28 @@ public class FrmQuanLyNguoiDung : Form
 
         try
         {
-            using var db = Program.NewDb();
-            var target = await db.Users.Include(x => x.Role).FirstOrDefaultAsync(x => x.MaTaiKhoan == u.MaTaiKhoan);
-            if (target == null) return;
-
-            var newRole = await db.Roles.FirstOrDefaultAsync(x => x.MaVaiTro == newRoleId);
-            if (newRole == null)
+            var roleService = new RoleService();
+            await roleService.AssignRoleAsync(curId ?? 0, new DTOs.Role.AssignRoleRequest
             {
-                MessageBox.Show("Vai trò không tồn tại trong hệ thống.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
+                MaTaiKhoan = u.MaTaiKhoan,
+                MaVaiTro = newRoleId
+            });
 
-            var oldRoleName = target.Role?.TenVaiTro ?? "Chưa có";
-            target.MaVaiTro = newRoleId;
-            target.NgayCapNhat = DateTime.UtcNow;
-
-            await db.SaveChangesAsync();
-
-            // Ghi vết
+            // Ghi vết nhật ký
             try
             {
-                await db.Database.ExecuteSqlInterpolatedAsync($"EXEC sp_GhiNhatKy N'PhanQuyenVaiTro', {target.TenDangNhap}, {curId}");
+                using var db = Program.NewDb();
+                await db.Database.ExecuteSqlInterpolatedAsync($"EXEC sp_GhiNhatKy N'PhanQuyenVaiTro', {u.TenDangNhap}, {curId}");
             }
             catch { }
 
-            MessageBox.Show($"Đã gán vai trò mới cho tài khoản '{target.TenDangNhap}':\n[{oldRoleName}] ➔ [{newRole.TenVaiTro}]",
+            MessageBox.Show($"Đã gán vai trò '{RoleConstants.GetName(newRoleId)}' cho tài khoản '{u.TenDangNhap}' thành công!",
                 "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
             LoadUsers();
         }
         catch (Exception ex)
         {
-            MessageBox.Show("Lỗi khi gán vai trò: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(ex.Message, "Thông báo kiểm soát phân quyền", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 }

@@ -15,6 +15,7 @@ public class UserDto
     public string? ChucVu { get; set; }
     public int MaVaiTro { get; set; }
     public string TenVaiTro { get; set; } = string.Empty;
+    public string MaCodeVaiTro { get; set; } = string.Empty;
     public string TrangThai { get; set; } = "HoatDong";
     public int SoLanDangNhapSai { get; set; }
     public DateTime? KhoaDenThoiDiem { get; set; }
