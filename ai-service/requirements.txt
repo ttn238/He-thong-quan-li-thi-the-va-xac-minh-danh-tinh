@@ -1,0 +1,17 @@
+# Python 3.10 - 3.13. Cai: pip install -r requirements.txt
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30,<1.0
+python-multipart>=0.0.9
+pydantic>=2.7,<3.0
+pydantic-settings>=2.3,<3.0
+numpy>=1.26
+opencv-python-headless>=4.9
+pillow>=10.3
+# OCR (ONNX Runtime, mo hinh di kem san trong goi)
+rapidocr>=3.0
+onnxruntime>=1.18
+# Nhan dien doi tuong YOLOv8 (keo theo torch, ban CPU la du)
+ultralytics>=8.3
+# Kiem thu
+pytest>=8.0
+httpx>=0.27
