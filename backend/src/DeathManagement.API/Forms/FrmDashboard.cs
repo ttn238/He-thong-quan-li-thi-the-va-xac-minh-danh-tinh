@@ -205,62 +205,62 @@ public class FrmDashboard : Form
             int gap = 20;
 
 
-        pnlCards.Controls.Add(CreateStatCard("TỔNG TÀI KHOẢN", lblTongUser, "Toàn hệ thống", UITheme.Navy, 0 * (cardWidth + gap)));
-        pnlCards.Controls.Add(CreateStatCard("ĐANG HOẠT ĐỘNG", lblUserHoatDong, "Được phép đăng nhập", UITheme.Green, 1 * (cardWidth + gap)));
-        pnlCards.Controls.Add(CreateStatCard("ĐANG BỊ KHÓA", lblUserKhoa, "Khóa tạm / vô hiệu hóa", UITheme.Red, 2 * (cardWidth + gap)));
-        pnlCards.Controls.Add(CreateStatCard("DANH MỤC VAI TRÒ", lblTongRole, "Cấu hình phân quyền", UITheme.Blue, 3 * (cardWidth + gap)));
-        pnlCards.Visible = laAdmin;   // thống kê tài khoản chỉ dành cho người có quyền ACCOUNT:VIEW
-        // Action Center Panel
-        var pnlActionCenter = new Panel
-        {
-            Dock = DockStyle.Fill,
-            BackColor = Color.White,
-            Margin = new Padding(0, 20, 0, 0)
-        };
-        pnlActionCenter.Paint += (s, e) =>
-        {
-            using var pen = new Pen(UITheme.Line);
-            e.Graphics.DrawRectangle(pen, 0, 0, pnlActionCenter.Width - 1, pnlActionCenter.Height - 1);
-        };
-
-        var lblActionTitle = new Label
-        {
-            Text = "TRUNG TÂM ĐIỀU HÀNH & TRUY CẬP NHANH CHỨC NĂNG",
-            Font = UITheme.FontBold(10.5f),
-            ForeColor = UITheme.Navy,
-            Location = new Point(25, 20),
-            AutoSize = true
-        };
-
-        var pnlButtons = new FlowLayoutPanel
-        {
-            Location = new Point(25, 60),
-            Size = new Size(1100, 420),
-            FlowDirection = FlowDirection.LeftToRight,
-            WrapContents = true,
-            AutoScroll = true
-        };
-
-        if (laAdmin)
-        {
-            pnlButtons.Controls.Add(CreateQuickActionButton("Quản lý tài khoản & Phân quyền", UITheme.Navy, () =>
+            pnlCards.Controls.Add(CreateStatCard("TỔNG TÀI KHOẢN", lblTongUser, "Toàn hệ thống", UITheme.Navy, 0 * (cardWidth + gap)));
+            pnlCards.Controls.Add(CreateStatCard("ĐANG HOẠT ĐỘNG", lblUserHoatDong, "Được phép đăng nhập", UITheme.Green, 1 * (cardWidth + gap)));
+            pnlCards.Controls.Add(CreateStatCard("ĐANG BỊ KHÓA", lblUserKhoa, "Khóa tạm / vô hiệu hóa", UITheme.Red, 2 * (cardWidth + gap)));
+            pnlCards.Controls.Add(CreateStatCard("DANH MỤC VAI TRÒ", lblTongRole, "Cấu hình phân quyền", UITheme.Blue, 3 * (cardWidth + gap)));
+            pnlCards.Visible = laAdmin;   // thống kê tài khoản chỉ dành cho người có quyền ACCOUNT:VIEW
+                                          // Action Center Panel
+            var pnlActionCenter = new Panel
             {
-                if (!PermissionUi.Check(this, ResourceAccount, ActionView)) return;
-                using var f = new FrmQuanLyNguoiDung();
-                f.ShowDialog(this);
-                LoadThongKe();
-            }));
-        }
-
-        if (AccessControl.Can(ResourceFile, ActionView))
-        {
-            pnlButtons.Controls.Add(CreateQuickActionButton("Quản lý kho hình ảnh & tệp đính kèm", ColorTranslator.FromHtml("#6c5ce7"), () =>
+                Dock = DockStyle.Fill,
+                BackColor = Color.White,
+                Margin = new Padding(0, 20, 0, 0)
+            };
+            pnlActionCenter.Paint += (s, e) =>
             {
-                if (!PermissionUi.Check(this, ResourceFile, ActionView)) return;
-                using var f = new FrmQuanLyHinhAnh();
-                f.ShowDialog(this);
-            }));
-        }
+                using var pen = new Pen(UITheme.Line);
+                e.Graphics.DrawRectangle(pen, 0, 0, pnlActionCenter.Width - 1, pnlActionCenter.Height - 1);
+            };
+
+            var lblActionTitle = new Label
+            {
+                Text = "TRUNG TÂM ĐIỀU HÀNH & TRUY CẬP NHANH CHỨC NĂNG",
+                Font = UITheme.FontBold(10.5f),
+                ForeColor = UITheme.Navy,
+                Location = new Point(25, 20),
+                AutoSize = true
+            };
+
+            var pnlButtons = new FlowLayoutPanel
+            {
+                Location = new Point(25, 60),
+                Size = new Size(1100, 420),
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = true,
+                AutoScroll = true
+            };
+
+            if (laAdmin)
+            {
+                pnlButtons.Controls.Add(CreateQuickActionButton("Quản lý tài khoản & Phân quyền", UITheme.Navy, () =>
+                {
+                    if (!PermissionUi.Check(this, ResourceAccount, ActionView)) return;
+                    using var f = new FrmQuanLyNguoiDung();
+                    f.ShowDialog(this);
+                    LoadThongKe();
+                }));
+            }
+
+            if (AccessControl.Can(ResourceFile, ActionView))
+            {
+                pnlButtons.Controls.Add(CreateQuickActionButton("Quản lý kho hình ảnh & tệp đính kèm", ColorTranslator.FromHtml("#6c5ce7"), () =>
+                {
+                    if (!PermissionUi.Check(this, ResourceFile, ActionView)) return;
+                    using var f = new FrmQuanLyHinhAnh();
+                    f.ShowDialog(this);
+                }));
+            }
 
             if (AccessControl.Can(ResourceAiResult, ActionView))
             {
@@ -278,53 +278,56 @@ public class FrmDashboard : Form
             f.ShowDialog(this);
         }));
 
-        if (AccessControl.Can(ResourceBody, ActionCreate))
-        {
-            pnlButtons.Controls.Add(CreateQuickActionButton("Tiếp nhận hồ sơ tử thi (Body)", ColorTranslator.FromHtml("#34495e"), () =>
+            if (AccessControl.Can(ResourceBody, ActionCreate))
             {
-                if (!PermissionUi.Check(this, ResourceBody, ActionCreate)) return;
-                MessageBox.Show("Chức năng Tiếp nhận tử thi đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }));
-        }
+                pnlButtons.Controls.Add(CreateQuickActionButton("Tiếp nhận hồ sơ tử thi (Body)", ColorTranslator.FromHtml("#34495e"), () =>
+                {
+                    if (!PermissionUi.Check(this, ResourceBody, ActionCreate)) return;
+                    MessageBox.Show("Chức năng Tiếp nhận tử thi đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }));
+            }
 
-        pnlButtons.Controls.Add(CreateQuickActionButton(isCitizen ? "📝 Khai báo tin báo sự việc / mất tích" : " Tiếp nhận tin báo sự việc", ColorTranslator.FromHtml("#0984e3"), () =>
-        {
-            using var f = new FrmTiepNhanTinBao();
-            f.ShowDialog(this);
-        }));
-
-        // Chức năng nghiệp vụ tử thi và AI chỉ hiển thị cho cán bộ / admin, không dành cho người dân
-        if (!isCitizen)
-        {
-            pnlButtons.Controls.Add(CreateQuickActionButton("📁 Tiếp nhận hồ sơ tử thi (Body)", ColorTranslator.FromHtml("#34495e"), () =>
+            pnlButtons.Controls.Add(CreateQuickActionButton(isCitizen ? "📝 Khai báo tin báo sự việc / mất tích" : " Tiếp nhận tin báo sự việc", ColorTranslator.FromHtml("#0984e3"), () =>
             {
-                MessageBox.Show("Chức năng Tiếp nhận tử thi đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                using var f = new FrmTiepNhanTinBao();
+                f.ShowDialog(this);
             }));
 
-            pnlButtons.Controls.Add(CreateQuickActionButton("🔍 Đối chiếu danh tính (AI Matching)", ColorTranslator.FromHtml("#27ae60"), () =>
+            // Chức năng nghiệp vụ tử thi và AI chỉ hiển thị cho cán bộ / admin, không dành cho người dân
+            if (!isCitizen)
             {
-        if (AccessControl.Can(ResourceMatching, ActionView))
-        {
-            pnlButtons.Controls.Add(CreateQuickActionButton("Đối chiếu danh tính (AI Matching)", ColorTranslator.FromHtml("#27ae60"), () =>
-            {
-                if (!PermissionUi.Check(this, ResourceMatching, ActionView)) return;
-                MessageBox.Show("Chức năng Đối chiếu danh tính AI đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }));
+                pnlButtons.Controls.Add(CreateQuickActionButton("📁 Tiếp nhận hồ sơ tử thi (Body)", ColorTranslator.FromHtml("#34495e"), () =>
+                {
+                    MessageBox.Show("Chức năng Tiếp nhận tử thi đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }));
+
+                pnlButtons.Controls.Add(CreateQuickActionButton("🔍 Đối chiếu danh tính (AI Matching)", ColorTranslator.FromHtml("#27ae60"), () =>
+                {
+                    if (AccessControl.Can(ResourceMatching, ActionView))
+                    {
+                        pnlButtons.Controls.Add(CreateQuickActionButton("Đối chiếu danh tính (AI Matching)", ColorTranslator.FromHtml("#27ae60"), () =>
+                        {
+                            if (!PermissionUi.Check(this, ResourceMatching, ActionView)) return;
+                            MessageBox.Show("Chức năng Đối chiếu danh tính AI đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }));
+                    }
+
+                    pnlActionCenter.Controls.Add(lblActionTitle);
+                    pnlActionCenter.Controls.Add(pnlButtons);
+
+                    pnlMainBody.Controls.Add(pnlActionCenter);
+                    if (pnlCards != null)
+                    {
+                        pnlMainBody.Controls.Add(pnlCards);
+                    }
+
+                    // Add All
+                    Controls.Add(pnlMainBody);
+                    Controls.Add(menuStrip);
+                    Controls.Add(pnlTopNav);
+                }));
+            }
         }
-
-        pnlActionCenter.Controls.Add(lblActionTitle);
-        pnlActionCenter.Controls.Add(pnlButtons);
-
-        pnlMainBody.Controls.Add(pnlActionCenter);
-        if (pnlCards != null)
-        {
-            pnlMainBody.Controls.Add(pnlCards);
-        }
-
-        // Add All
-        Controls.Add(pnlMainBody);
-        Controls.Add(menuStrip);
-        Controls.Add(pnlTopNav);
     }
 
     private Panel CreateStatCard(string title, Label lblValue, string sub, Color accentColor, int left)
