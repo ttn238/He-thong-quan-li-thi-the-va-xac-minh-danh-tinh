@@ -169,6 +169,14 @@ public class FrmDashboard : Form
         { Visible = AccessControl.Can(ResourceMissingPerson, ActionView) });
         mnuNghiepVu.DropDownItems.Add(new ToolStripMenuItem("Đối chiếu & Xác minh danh tính...")
         { Visible = AccessControl.Can(ResourceMatching, ActionView) });
+        var mnuKetQuaAi = new ToolStripMenuItem("🤖 Phân tích AI & Hiển thị kết quả AI...", null, (s, e) =>
+        {
+            if (!PermissionUi.Check(this, ResourceAiResult, ActionView)) return;
+            using var f = new FrmKetQuaAI();
+            f.ShowDialog(this);
+        })
+        { Visible = AccessControl.Can(ResourceAiResult, ActionView) };
+        mnuNghiepVu.DropDownItems.Add(mnuKetQuaAi);
         mnuNghiepVu.DropDownItems.Add(new ToolStripSeparator());
         var mnuKhoAnh = new ToolStripMenuItem("🖼️ Kho hình ảnh & Tệp đính kèm...", null, (s, e) =>
         {
@@ -254,7 +262,17 @@ public class FrmDashboard : Form
             }));
         }
 
-        pnlButtons.Controls.Add(CreateQuickActionButton("Thay đổi mật khẩu cá nhân", UITheme.Blue, () =>
+            if (AccessControl.Can(ResourceAiResult, ActionView))
+            {
+                pnlButtons.Controls.Add(CreateQuickActionButton("Phân tích AI & Hiển thị kết quả AI", ColorTranslator.FromHtml("#0f2a4a"), () =>
+                {
+                    if (!PermissionUi.Check(this, ResourceAiResult, ActionView)) return;
+                    using var f = new FrmKetQuaAI();
+                    f.ShowDialog(this);
+                }));
+            }
+
+            pnlButtons.Controls.Add(CreateQuickActionButton("Thay đổi mật khẩu cá nhân", UITheme.Blue, () =>
         {
             using var f = new FrmDoiMatKhau();   // tự phục vụ: mọi vai trò đều được đổi mật khẩu của chính mình
             f.ShowDialog(this);
