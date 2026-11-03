@@ -19,6 +19,17 @@ T = TypeVar("T")
 
 @lru_cache
 def get_ocr_engine() -> OcrEngine:
+    s = get_settings()
+    if s.ocr_engine == "paddle":
+        from app.services.paddle_ocr_engine import PaddleOcrEngine  # import tre: khong bat buoc cai paddle
+
+        return PaddleOcrEngine(
+            lang=s.paddle_lang,
+            device=s.paddle_device,
+            det_model=s.paddle_det_model,
+            rec_model=s.paddle_rec_model,
+            retry_cooldown_s=s.paddle_retry_cooldown_s,
+        )
     return RapidOcrEngine()
 
 

@@ -48,3 +48,8 @@ class ProcessingTimeoutError(AppError):
 class ModelUnavailableError(AppError):
     status_code = 503
     code = "MODEL_UNAVAILABLE"
+
+
+class OcrFailedError(AppError):
+    status_code = 500
+    code = "OCR_FAILED"

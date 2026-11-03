@@ -2,7 +2,7 @@
 hoac file .env (vi du AI_MAX_IMAGE_MB=5)."""
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -33,6 +33,14 @@ class Settings(BaseSettings):
 
     # --- OCR ---
     ocr_min_confidence: float = Field(0.5, ge=0, le=1)
+
+    # Engine OCR: "rapidocr" (mac dinh, ONNX) hoac "paddle" (PaddleOCR, can requirements-paddle.txt)
+    ocr_engine: Literal["rapidocr", "paddle"] = "rapidocr"
+    paddle_lang: str = "en"
+    paddle_device: str = "cpu"  # "cpu" hoac "gpu:0" (GPU chua kiem thu)
+    paddle_det_model: Optional[str] = None  # vi du PP-OCRv5_mobile_det (chua kiem thu), None = mac dinh
+    paddle_rec_model: Optional[str] = None  # vi du PP-OCRv5_mobile_rec (chua kiem thu), None = mac dinh
+    paddle_retry_cooldown_s: float = Field(30.0, ge=0, description="Cho bay nhieu giay sau loi nap truoc khi thu lai")
 
     # --- Nhan dien doi tuong ---
     detector_weights: Path = BASE_DIR / "models" / "image_model" / "yolov8n.pt"
