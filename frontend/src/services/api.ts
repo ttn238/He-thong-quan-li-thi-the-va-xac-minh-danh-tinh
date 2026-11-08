@@ -1,6 +1,14 @@
-// Axios or native fetch based API client with JWT interceptor and error handling
+// Native fetch based API client with JWT interceptor and error handling
+import { session } from './session';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://localhost:7196/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://localhost:7196/api/v1';
+
+export class ApiError extends Error {
+  constructor(message: string, public status = 0) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
 
 export interface ApiResponse<T = any> {
   data?: T;
@@ -10,7 +18,7 @@ export interface ApiResponse<T = any> {
 
 export class ApiClient {
   private static getToken(): string | null {
-    return localStorage.getItem('access_token');
+    return session.get()?.token ?? null;
   }
 
   public static async request<T = any>(
@@ -30,20 +38,23 @@ export class ApiClient {
 
     const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
+    let response: Response;
+    try {
+      response = await fetch(url, { ...options, headers });
+    } catch {
+      throw new ApiError('Không kết nối được máy chủ.');
+    }
 
-    if (response.status === 401) {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('current_user');
+    // 401 khi đang có phiên = hết hạn/không hợp lệ => xóa phiên + báo cho app đưa về đăng nhập.
+    // 401 ở chính API đăng nhập = sai thông tin, giữ nguyên thông báo từ server.
+    if (response.status === 401 && token) {
+      session.clear();
       window.dispatchEvent(new Event('auth:unauthorized'));
-      throw new Error('Phiên đăng nhập đã hết hạn hoặc không hợp lệ.');
+      throw new ApiError('Phiên đăng nhập đã hết hạn hoặc không hợp lệ.', 401);
     }
 
     if (response.status === 403) {
-      throw new Error('Bạn không có quyền thực hiện thao tác này.');
+      throw new ApiError('Bạn không có quyền thực hiện thao tác này.', 403);
     }
 
     if (!response.ok) {
@@ -59,7 +70,7 @@ export class ApiClient {
         // Fallback to status text
         if (response.statusText) errorMessage = response.statusText;
       }
-      throw new Error(errorMessage);
+      throw new ApiError(errorMessage, response.status);
     }
 
     // Check if response has content
@@ -106,5 +117,7 @@ export class ApiClient {
     return this.request<T>(endpoint, { method: 'DELETE' });
   }
 }
+
+export const post = <T = any>(endpoint: string, data?: any) => ApiClient.post<T>(endpoint, data);
 
 export default ApiClient;
