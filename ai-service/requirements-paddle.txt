@@ -1,0 +1,23 @@
+# TUY CHON - chi can khi dat AI_OCR_ENGINE=paddle. Cai SAU requirements.txt:
+#   pip install -r requirements.txt
+#   pip install -r requirements-paddle.txt
+# Python 3.12.10, Windows 64-bit, CPU. Bo phien ban nay da cai va chay duoc tren may Windows cua nhom
+# (xem docs/reports/5.6-paddleocr-integration-report.md); chua thu cung voi ultralytics/torch trong cung venv.
+#
+# - paddlex phai ghim 3.1.x: paddleocr 3.1.0 khong dat can tren, pip se lay paddlex moi nhat (3.7.2) va
+#   PaddleOCR(...) loi "PaddlePredictorOption.__init__() takes 1 positional argument but 2 were given".
+# - paddleocr 3.0.0 / paddlex 3.0.0 ghim pandas<=1.5.3 (khong co wheel cho Python 3.12): KHONG dung.
+# - numpy 1.26.4 la ban da kiem chung cung Paddle.
+# - paddlex keo opencv-contrib-python; neu import cv2 loi do nhieu goi OpenCV de len nhau:
+#     pip uninstall -y opencv-python opencv-python-headless opencv-contrib-python
+#     pip install opencv-contrib-python==4.10.0.84
+numpy==1.26.4
+paddlepaddle==3.1.0
+paddleocr==3.1.0
+paddlex==3.1.4
+langchain==0.3.30
+langchain-community==0.3.31
+langchain-core==0.3.86
+langchain-openai==0.3.35
+langchain-text-splitters==0.3.11
+

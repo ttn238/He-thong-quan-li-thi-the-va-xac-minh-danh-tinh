@@ -196,3 +196,20 @@ Import postman_collection.json (đặt biến baseUrl = http://localhost:8000), 
 pip check báo ultralytics requires opencv-python: bỏ qua được, service dùng opencv-python-headless. Nếu import cv2 lỗi do hai gói OpenCV đè nhau: pip uninstall -y opencv-python opencv-python-headless && pip install opencv-python-headless.
 Lỗi MODEL_UNAVAILABLE: thiếu app/models/image_model/yolov8n.pt (xem mục 2).
 Yêu cầu đầu tiên chậm hơn (khởi tạo ONNX Runtime) khi tắt AI_PRELOAD_MODELS.
+
+## 6. Dùng PaddleOCR thay RapidOCR (tùy chọn, task 5.6)
+
+Mặc định service dùng RapidOCR. PaddleOCR là engine thứ hai, cắm vào cùng giao diện `OcrEngine` nên **không đổi API** (`/api/v1/ocr/license-plate` giữ nguyên). Chỉ bật khi đặt `AI_OCR_ENGINE=paddle`.
+
+Cài (Python 3.12, CPU; nên dùng venv riêng để tránh xung đột OpenCV/torch):
+```powershell
+pip install -r requirements.txt
+pip install -r requirements-paddle.txt
+$env:AI_OCR_ENGINE = "paddle"
+$env:AI_REQUEST_TIMEOUT_S = "120"      # PaddleOCR trên CPU chậm hơn nhiều so với RapidOCR
+python scripts\paddle_smoke_test.py    # kiểm tra OCR thật (lần đầu cần Internet để tải mô hình)
+uvicorn main:app --host 127.0.0.1 --port 8000
+```
+Biến cấu hình: `AI_OCR_ENGINE`, `AI_PADDLE_LANG` (en), `AI_PADDLE_DEVICE` (cpu), `AI_PADDLE_DET_MODEL`, `AI_PADDLE_REC_MODEL`, `AI_PADDLE_RETRY_COOLDOWN_S`.
+
+Lưu ý: nếu nạp PaddleOCR thất bại (thiếu thư viện, không tải được mô hình) API trả `503 MODEL_UNAVAILABLE`, không làm sập service. Kết quả OCR chưa được xác minh. Xem `docs/reports/5.6-paddleocr-integration-report.md`.
