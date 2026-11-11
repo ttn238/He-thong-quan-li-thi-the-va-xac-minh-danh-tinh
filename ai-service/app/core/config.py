@@ -39,6 +39,23 @@ class Settings(BaseSettings):
     detector_min_confidence: float = Field(0.35, ge=0, le=1)
     detector_max_objects: int = Field(50, ge=1)
 
+    # --- Tra cuu dia diem (Nominatim/OpenStreetMap, mien phi) ---
+    # Chinh sach Nominatim cong cong: <= 1 yeu cau/giay, User-Agent dinh danh (nen kem lien he), phai cache,
+    # khong gui du lieu ca nhan/mat. Dat geocoder_enabled=false de tat; doi geocoder_base_url de dung may chu rieng.
+    geocoder_enabled: bool = True
+    geocoder_base_url: str = "https://nominatim.openstreetmap.org"
+    geocoder_user_agent: str = "DeathManagement-AI-Service/1.0"
+    geocoder_timeout_s: float = Field(5.0, gt=0, description="Timeout moi lan goi nguon tra cuu")
+    geocoder_min_interval_s: float = Field(1.0, ge=0, description="Khoang cach toi thieu giua 2 lan goi ra ngoai")
+    geocoder_country_codes: str = "vn"
+    geocoder_language: str = "vi"
+    geocoder_max_attempts: int = Field(3, ge=1, le=5, description="So bien the (day du -> rut gon) thu toi da")
+    geocoder_budget_s: float = Field(12.0, gt=0, description="Tong thoi gian toi da de thu cac bien the rut gon")
+    geocoder_cache_ttl_s: float = Field(86400.0, ge=0)
+    geocoder_negative_cache_ttl_s: float = Field(300.0, ge=0, description="Cache ket qua 'khong tim thay'")
+    geocoder_cache_max_entries: int = Field(1000, ge=1)
+    geocoder_cooldown_s: float = Field(60.0, ge=0, description="Tam ngung goi sau loi mang/429/403/5xx")
+
     # Nap san mo hinh luc khoi dong de request dau khong bi cham/timeout
     preload_models: bool = True
 

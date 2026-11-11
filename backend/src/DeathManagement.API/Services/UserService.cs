@@ -103,6 +103,7 @@ public class UserService : IUserService
         if (!string.IsNullOrWhiteSpace(request.CCCD) && await _userRepository.ExistsByCccdAsync(request.CCCD.Trim(), id))
             throw new InvalidOperationException($"Số CCCD '{request.CCCD}' đã được sử dụng bởi tài khoản khác.");
 
+        var oldMaVaiTro = existing.MaVaiTro;
         existing.HoTen = request.HoTen.Trim();
         existing.Email = request.Email?.Trim();
         existing.SoDienThoai = request.SoDienThoai?.Trim();
@@ -112,15 +113,15 @@ public class UserService : IUserService
         existing.MaVaiTro = request.MaVaiTro;
         existing.NgayCapNhat = DateTime.UtcNow;
 
-        var updated = await _userRepository.UpdateAsync(existing);
-        return MapToDto(updated);
-
-        if (existing.MaVaiTro != request.MaVaiTro)
+        if (oldMaVaiTro != request.MaVaiTro)
         {
-            AccessControl.Require(ResourcePermission, ActionUpdate);   // đổi vai trò = phân quyền
+            AccessControl.Require(ResourcePermission, ActionUpdate);
             if (AccessControl.UserId == id)
                 throw new InvalidOperationException("Không được tự thay đổi vai trò của chính mình.");
         }
+
+        var updated = await _userRepository.UpdateAsync(existing);
+        return MapToDto(updated);
     }
 
     public async Task<UserDto?> UpdateProfileAsync(long currentUserId, UpdateProfileRequest request)
@@ -199,8 +200,6 @@ public class UserService : IUserService
             5 => "NGUOI_DAN",
             _ => "OTHER"
         };
-
-        string tenVaiTro = user.Role?.TenVaiTro ?? "KhongXacDinh";
 
         return new UserDto
         {

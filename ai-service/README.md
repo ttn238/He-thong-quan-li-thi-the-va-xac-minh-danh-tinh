@@ -196,3 +196,37 @@ Import postman_collection.json (đặt biến baseUrl = http://localhost:8000), 
 pip check báo ultralytics requires opencv-python: bỏ qua được, service dùng opencv-python-headless. Nếu import cv2 lỗi do hai gói OpenCV đè nhau: pip uninstall -y opencv-python opencv-python-headless && pip install opencv-python-headless.
 Lỗi MODEL_UNAVAILABLE: thiếu app/models/image_model/yolov8n.pt (xem mục 2).
 Yêu cầu đầu tiên chậm hơn (khởi tạo ONNX Runtime) khi tắt AI_PRELOAD_MODELS.
+
+## 6. Dùng PaddleOCR thay RapidOCR (tùy chọn, task 5.6)
+
+Mặc định service dùng RapidOCR. PaddleOCR là engine thứ hai, cắm vào cùng giao diện `OcrEngine` nên **không đổi API** (`/api/v1/ocr/license-plate` giữ nguyên). Chỉ bật khi đặt `AI_OCR_ENGINE=paddle`.
+
+Cài (Python 3.12, CPU; nên dùng venv riêng để tránh xung đột OpenCV/torch):
+```powershell
+pip install -r requirements.txt
+pip install -r requirements-paddle.txt
+$env:AI_OCR_ENGINE = "paddle"
+$env:AI_REQUEST_TIMEOUT_S = "120"      # PaddleOCR trên CPU chậm hơn nhiều so với RapidOCR
+python scripts\paddle_smoke_test.py    # kiểm tra OCR thật (lần đầu cần Internet để tải mô hình)
+uvicorn main:app --host 127.0.0.1 --port 8000
+```
+Biến cấu hình: `AI_OCR_ENGINE`, `AI_PADDLE_LANG` (en), `AI_PADDLE_DEVICE` (cpu), `AI_PADDLE_DET_MODEL`, `AI_PADDLE_REC_MODEL`, `AI_PADDLE_RETRY_COOLDOWN_S`.
+
+Lưu ý: nếu nạp PaddleOCR thất bại (thiếu thư viện, không tải được mô hình) API trả `503 MODEL_UNAVAILABLE`, không làm sập service. Kết quả OCR chưa được xác minh. Xem `docs/reports/5.6-paddleocr-integration-report.md`.
+
+## 7. Tra cứu địa điểm từ chuỗi OCR / địa chỉ nhập tay
+
+`POST /api/v1/location/search` nhận một chuỗi địa điểm và trả về **danh sách gợi ý** (tên/địa chỉ, tọa độ, mức khớp, độ giống, liên kết OpenStreetMap). Kết quả luôn `verified=false`. Đặc tả request/response và mã lỗi: `docs/api/api-documentation.md` mục 2.9.
+
+```bash
+curl -X POST http://localhost:8000/api/v1/location/search \
+  -H "Content-Type: application/json" \
+  -d '{"text": "12 Nguyễn Huệ, P. Bến Nghé, Q.1, TPHCM"}'
+```
+
+Các file: `app/services/address_normalizer.py` (chuẩn hóa, ghép dòng OCR thành địa chỉ bằng `address_text_from_ocr_lines`), `app/services/geocoding_provider.py` (Nominatim, giới hạn tốc độ, cache, cooldown), `app/services/location_service.py` (thử đầy đủ → rút gọn, xếp hạng, loại trùng), `app/api/location_routes.py`.
+
+- **Nguồn:** Nominatim công cộng của OpenStreetMap (miễn phí, không cần key). Chính sách: ≤ 1 yêu cầu/giây, User-Agent định danh, bắt buộc cache, không autocomplete, không gửi dữ liệu cá nhân/mật. **Đặt `AI_GEOCODER_USER_AGENT` kèm thông tin liên hệ** (xem `env.example`). Chính sách có thể đổi: đọc lại https://operations.osmfoundation.org/policies/nominatim/ trước khi triển khai thật. Tắt bằng `AI_GEOCODER_ENABLED=false`, đổi sang máy chủ riêng bằng `AI_GEOCODER_BASE_URL`.
+- **Không thêm thư viện:** gọi mạng bằng `urllib` của Python.
+- **Chưa có OCR đọc chữ địa chỉ:** `ocr_service.py` hiện chỉ đọc biển số. Muốn lấy địa chỉ từ ảnh cần thêm endpoint OCR văn bản (PaddleOCR với mô hình tiếng Việt, đã kiểm thử), rồi đưa các dòng qua `address_text_from_ocr_lines` và gọi tra cứu.
+- **Kiểm thử:** `python -m pytest tests/test_address_normalizer.py tests/test_geocoding_provider.py tests/test_location_service.py -q`. Các test dùng provider/`fetch`/đồng hồ giả, **không gọi mạng thật**, nên chưa chứng minh Nominatim thật trả đúng địa chỉ Việt Nam.

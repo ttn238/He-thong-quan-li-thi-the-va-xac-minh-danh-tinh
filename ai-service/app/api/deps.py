@@ -1,6 +1,7 @@
 """Dependency dung chung: lay engine, doc anh dau vao, chay tac vu AI co gioi han
 thoi gian va so luong dong thoi."""
 import asyncio
+import logging
 import time
 from functools import lru_cache
 from typing import Callable, Optional, TypeVar
@@ -10,16 +11,42 @@ from fastapi import File, Form, Request, UploadFile
 from app.core.config import Settings, get_settings
 from app.core.errors import ImageTooLargeError, ProcessingTimeoutError
 from app.schemas.prediction_schema import ApiResponse
+from app.services.geocoding_provider import GeocodingProvider, NominatimProvider
 from app.services.object_detection import ObjectDetector, YoloDetector
 from app.services.ocr_service import OcrEngine, RapidOcrEngine
 from app.utils.image_processing import read_bytes_from_path
 
 T = TypeVar("T")
+logger = logging.getLogger(__name__)
 
 
 @lru_cache
 def get_ocr_engine() -> OcrEngine:
     return RapidOcrEngine()
+
+
+@lru_cache
+def get_geocoder() -> GeocodingProvider:
+    """Mot provider dung chung toan tien trinh: gioi han 1 yeu cau/giay va cache chi dung khi dung chung."""
+    s = get_settings()
+    if "nominatim.openstreetmap.org" in s.geocoder_base_url and "@" not in s.geocoder_user_agent \
+            and "http" not in s.geocoder_user_agent:
+        logger.warning(
+            "AI_GEOCODER_USER_AGENT chua co thong tin lien he; chinh sach Nominatim cong cong yeu cau "
+            "User-Agent dinh danh (nen kem email/URL lien he)"
+        )
+    return NominatimProvider(
+        base_url=s.geocoder_base_url,
+        user_agent=s.geocoder_user_agent,
+        timeout_s=s.geocoder_timeout_s,
+        min_interval_s=s.geocoder_min_interval_s,
+        country_codes=s.geocoder_country_codes,
+        language=s.geocoder_language,
+        cache_ttl_s=s.geocoder_cache_ttl_s,
+        negative_cache_ttl_s=s.geocoder_negative_cache_ttl_s,
+        cache_max_entries=s.geocoder_cache_max_entries,
+        cooldown_s=s.geocoder_cooldown_s,
+    )
 
 
 @lru_cache

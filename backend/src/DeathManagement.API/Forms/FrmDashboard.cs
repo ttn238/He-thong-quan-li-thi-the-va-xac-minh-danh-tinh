@@ -202,6 +202,8 @@ public class FrmDashboard : Form
         pnlCards.Controls.Add(CreateStatCard("ĐANG BỊ KHÓA", lblUserKhoa, "Khóa tạm / vô hiệu hóa", UITheme.Red, 2 * (cardWidth + gap)));
         pnlCards.Controls.Add(CreateStatCard("DANH MỤC VAI TRÒ", lblTongRole, "Cấu hình phân quyền", UITheme.Blue, 3 * (cardWidth + gap)));
         pnlCards.Visible = laAdmin;   // thống kê tài khoản chỉ dành cho người có quyền ACCOUNT:VIEW
+        }
+
         // Action Center Panel
         var pnlActionCenter = new Panel
         {
@@ -283,15 +285,14 @@ public class FrmDashboard : Form
                 MessageBox.Show("Chức năng Tiếp nhận tử thi đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }));
 
-            pnlButtons.Controls.Add(CreateQuickActionButton("🔍 Đối chiếu danh tính (AI Matching)", ColorTranslator.FromHtml("#27ae60"), () =>
+            if (AccessControl.Can(ResourceMatching, ActionView))
             {
-        if (AccessControl.Can(ResourceMatching, ActionView))
-        {
-            pnlButtons.Controls.Add(CreateQuickActionButton("Đối chiếu danh tính (AI Matching)", ColorTranslator.FromHtml("#27ae60"), () =>
-            {
-                if (!PermissionUi.Check(this, ResourceMatching, ActionView)) return;
-                MessageBox.Show("Chức năng Đối chiếu danh tính AI đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }));
+                pnlButtons.Controls.Add(CreateQuickActionButton("Đối chiếu danh tính (AI Matching)", ColorTranslator.FromHtml("#27ae60"), () =>
+                {
+                    if (!PermissionUi.Check(this, ResourceMatching, ActionView)) return;
+                    MessageBox.Show("Chức năng Đối chiếu danh tính AI đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }));
+            }
         }
 
         pnlActionCenter.Controls.Add(lblActionTitle);

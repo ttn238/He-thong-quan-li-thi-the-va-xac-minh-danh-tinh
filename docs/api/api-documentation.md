@@ -56,3 +56,85 @@
 - `PUT /notifications/{id}/read`: Đánh dấu thông báo đã đọc.
 - `GET /reports/dashboard`: Thống kê số liệu Dashboard cho Admin/Officer.
 - `GET /reports/export`: Xuất báo cáo thống kê định dạng PDF hoặc Excel.
+
+### 2.9. AI Service – Tra cứu địa điểm (`POST /api/v1/location/search`)
+
+> Endpoint của **ai-service** (FastAPI, mặc định `http://localhost:8000`), chỉ mở trong mạng nội bộ. Backend chưa tích hợp; khi tích hợp, backend gọi endpoint này rồi trả kết quả cho client. Endpoint nhận **chuỗi văn bản** (chuỗi do OCR đọc ra hoặc địa chỉ nhập tay) và trả về **danh sách gợi ý**; kết quả **không bao giờ được coi là đã xác minh**.
+
+**Request** (`application/json`)
+
+| Trường | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `text` | string (1–300 ký tự) | Có | Chuỗi địa điểm/địa chỉ cần tra cứu |
+| `limit` | int (1–10, mặc định 5) | Không | Số gợi ý tối đa |
+
+```json
+{ "text": "12 Nguyễn Huệ, P. Bến Nghé, Q.1, TPHCM", "limit": 5 }
+```
+
+**Response** – cùng khung với các endpoint AI khác (`success`, `request_id`, `processing_ms`, `data`, `error`):
+
+```json
+{
+  "success": true,
+  "request_id": "6ab1b9d293cf405a",
+  "processing_ms": 1530,
+  "data": {
+    "query": "12 Nguyễn Huệ, P. Bến Nghé, Q.1, TPHCM",
+    "normalized_query": "12 Nguyễn Huệ, Phường Bến Nghé, Quận 1, Thành phố Hồ Chí Minh",
+    "found": true,
+    "verified": false,
+    "match_scope": "partial",
+    "used_query": "Phường Bến Nghé, Quận 1, Thành phố Hồ Chí Minh",
+    "dropped_parts": ["12 Nguyễn Huệ"],
+    "ambiguous": false,
+    "candidates": [
+      {
+        "display_name": "Phường Bến Nghé, Quận 1, Thành phố Hồ Chí Minh, Việt Nam",
+        "lat": 10.7769, "lon": 106.7009,
+        "match_level": "ward",
+        "similarity": 0.667,
+        "importance": 0.45,
+        "components": { "house_number": null, "road": null, "ward": "Phường Bến Nghé",
+                        "district": "Quận 1", "city": "Thành phố Hồ Chí Minh",
+                        "province": null, "postcode": null, "country_code": "vn" },
+        "source": "nominatim",
+        "osm_url": "https://www.openstreetmap.org/relation/2000000"
+      }
+    ],
+    "warnings": ["Không tìm thấy địa chỉ đầy đủ; kết quả chỉ khớp phần còn lại sau khi bỏ: 12 Nguyễn Huệ."],
+    "attribution": "Dữ liệu © OpenStreetMap contributors (ODbL), tra cứu qua Nominatim",
+    "notice": "Chỉ là gợi ý từ dữ liệu bản đồ mở, chưa được xác minh. Cán bộ cần đối chiếu thực tế trước khi sử dụng."
+  },
+  "error": null
+}
+```
+
+| Trường `data` | Ý nghĩa |
+|---|---|
+| `normalized_query` | Chuỗi sau chuẩn hóa (khoảng trắng, dấu câu, viết tắt P./Q./TP./TPHCM…, dấu phẩy giữa các cấp) |
+| `found` | `false` = không có gợi ý nào. Đây là kết quả **hợp lệ (HTTP 200)**, không phải lỗi |
+| `verified` | Luôn `false` |
+| `match_scope` | `full`: khớp theo địa chỉ đầy đủ; `partial`: phải bỏ bớt phần cụ thể nhất (`dropped_parts`) mới có kết quả. `null` nếu không tìm thấy |
+| `ambiguous` | `true` khi có nhiều gợi ý gần như ngang nhau, người dùng phải tự chọn |
+| `candidates[].match_level` | Mức chi tiết tìm được: `house`, `street`, `ward`, `district`, `city`, `province`, `country`, `other` |
+| `candidates[].similarity` | Độ giống (0–1) giữa chuỗi nhập và kết quả, tính theo từ khóa (ước lượng, **không phải** độ chính xác vị trí) |
+| `candidates[].osm_url` | Liên kết để đối chiếu trên OpenStreetMap |
+| `warnings` | Cảnh báo cần hiển thị cho người dùng (khớp một phần, nhiều phương án, độ giống thấp, đơn vị hành chính có thể đã thay đổi…) |
+| `attribution` | Dòng ghi nguồn OpenStreetMap, **phải hiển thị** cùng kết quả |
+
+**Mã lỗi**
+
+| HTTP | `error.code` | Nguyên nhân |
+|---|---|---|
+| 400 | `INVALID_ADDRESS` | Chuỗi rỗng hoặc không còn nội dung sau chuẩn hóa (chỉ ký tự nhiễu, chỉ "Việt Nam"…) |
+| 422 | `VALIDATION_ERROR` | `text` rỗng/dài quá 300 ký tự, `limit` ngoài 1–10 |
+| 503 | `GEOCODING_UNAVAILABLE` | Lỗi mạng, bị giới hạn tốc độ (429/403), nguồn lỗi 5xx hoặc trả dữ liệu không hợp lệ. **Không được hiểu là "không tìm thấy"** |
+| 503 | `GEOCODING_DISABLED` | Tính năng bị tắt (`AI_GEOCODER_ENABLED=false`) |
+| 504 | `PROCESSING_TIMEOUT` | Xử lý vượt `AI_REQUEST_TIMEOUT_S` |
+
+**Hành vi cần biết**
+- Thử địa chỉ đầy đủ trước; nếu không có kết quả thì bỏ dần phần cụ thể nhất (số nhà, đường…), tối đa `AI_GEOCODER_MAX_ATTEMPTS` lần và không bao giờ rút xuống chỉ còn một phần.
+- Kết quả trùng (cùng tọa độ hoặc cùng tên) được gộp; xếp theo `similarity` rồi `importance`.
+- Nguồn tra cứu mặc định là Nominatim công cộng của OpenStreetMap: tối đa 1 yêu cầu/giây trên toàn dịch vụ, có cache (24 giờ; "không tìm thấy" 5 phút), tạm ngưng gọi 60 giây sau khi bị 429/403/5xx hoặc lỗi mạng. Phù hợp demo/lưu lượng nhỏ; triển khai thật nên dùng máy chủ Nominatim riêng (`AI_GEOCODER_BASE_URL`).
+- **Quyền riêng tư:** chính sách Nominatim công cộng không cho phép gửi dữ liệu cá nhân/tài liệu mật, và chuỗi địa điểm được gửi ra dịch vụ bên ngoài. Chỉ gửi chuỗi địa điểm (không kèm tên, CCCD, mã hồ sơ); cân nhắc việc gửi địa điểm của hồ sơ thi thể ra ngoài trước khi bật. Log của dịch vụ không ghi chuỗi địa chỉ.
