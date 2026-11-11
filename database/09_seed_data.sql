@@ -136,7 +136,7 @@ INSERT dbo.ThamSoHeThong (TenThamSo, GiaTri, MoTa) VALUES
  ('REVIEW_INTERVAL_DAYS',N'30',  N'Chu kỳ nhắc rà soát hồ sơ chưa xác định (ngày)');
 
 /* 5. Danh muc */
-INSERT dbo.LoaiTinBao (TenLoai) VALUES
+INSERT dbo.LoaiTinBao (TenLoaiTinBao) VALUES
  (N'Tai nạn giao thông'), (N'Phát hiện người tử vong'), (N'Đuối nước'), (N'Cháy nổ'), (N'Khác');
 
 INSERT dbo.LoaiDoVat (TenLoai) VALUES
@@ -149,8 +149,8 @@ INSERT dbo.ViTriLuuTru (Khu, Tu, Ngan, SucChua) VALUES
  (N'A', N'A02', N'N01', 1), (N'A', N'A02', N'N02', 1);
 
 /* 7. Tai khoan mau (MatKhauHash la CHO GIU CHO - thay bang bcrypt/argon2 that khi chay ung dung) */
-INSERT dbo.TaiKhoanNguoiDung (TenDangNhap, Email, SoDienThoai, MatKhauHash, HoTen, DonVi, MaVaiTro)
-SELECT v.TenDangNhap, v.Email, v.SDT, CONVERT(VARCHAR(64), HASHBYTES('SHA2_256', '123456'), 2), v.HoTen, v.DonVi, r.MaVaiTro
+INSERT dbo.TaiKhoanNguoiDung (TenDangNhap, Email, SoDienThoai, CCCD, MatKhauHash, HoTen, DonVi, ChucVu, MaVaiTro)
+SELECT v.TenDangNhap, v.Email, v.SDT, v.CCCD, CONVERT(VARCHAR(64), HASHBYTES('SHA2_256', '123456'), 2), v.HoTen, v.DonVi, v.ChucVu, r.MaVaiTro
 FROM (VALUES
  ('admin',    'admin@demo.local',    '0900000001', '001090000001', N'Quản trị viên Hệ thống', N'Phòng Công nghệ thông tin', N'Quản trị viên',       'ADMIN'),
  ('canbo01',  'canbo01@demo.local',  '0900000002', '001090000002', N'Nguyễn Văn An',          N'Công an Quận 1',            N'Cán bộ điều tra',     'CONG_AN'),

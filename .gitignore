@@ -60,3 +60,4 @@ appsettings.local.json
 *.log
 uploads/
 private_images/
+App_Data/

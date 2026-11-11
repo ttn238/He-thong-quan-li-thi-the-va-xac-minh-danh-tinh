@@ -33,10 +33,10 @@ public class FrmLogin : Form
     static Font F(float size, FontStyle style = FontStyle.Regular, string name = "Segoe UI") => new(name, size, style);
 
     // ===== Các control cần dùng trong xử lý =====
-    readonly TextBox txtUser = new() { BorderStyle = BorderStyle.None, Font = F(10), PlaceholderText = "cstt.admin_dvi" };
+    readonly TextBox txtUser = new() { BorderStyle = BorderStyle.None, Font = F(10), PlaceholderText = "cstt.admin_dvi", MaxLength = 100 };
     readonly TextBox txtPass = new() { BorderStyle = BorderStyle.None, Font = F(10), PlaceholderText = "••••••••••••", UseSystemPasswordChar = true };
     readonly ComboBox cboDonVi = new() { DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, Font = F(9) };
-    readonly CheckBox chkNho = new() { Text = "Ghi nhớ phiên làm việc trên máy trạm", Checked = true, AutoSize = true, ForeColor = Navy, Font = F(8.25f) };
+    readonly CheckBox chkNho = new() { Text = "Ghi nhớ phiên làm việc trên máy trạm", Checked = false, AutoSize = true, ForeColor = Navy, Font = F(8.25f) };
     readonly Label lblLoi = new()
     {
         Size = new Size(404, 38),
@@ -101,9 +101,16 @@ public class FrmLogin : Form
     async void BtnLogin_Click(object? sender, EventArgs e)
     {
         var user = txtUser.Text.Trim();
-        if (user.Length == 0 || txtPass.Text.Length == 0)
+        if (user.Length == 0)
         {
-            HienLoi("Vui lòng nhập tên đăng nhập và mật khẩu.");
+            HienLoi("Tên đăng nhập không được để trống.");
+            txtUser.Focus();
+            return;
+        }
+        if (txtPass.Text.Length == 0)
+        {
+            HienLoi("Mật khẩu không được để trống.");
+            txtPass.Focus();
             return;
         }
 
@@ -113,17 +120,19 @@ public class FrmLogin : Form
         try
         {
             using var db = Program.NewDb();
-            var (ket, tk) = await new AuthService(db).DangNhapAsync(user, txtPass.Text);
+            var (ket, tk, thongBao) = await new AuthService(db).DangNhapAsync(user, txtPass.Text);
 
             if (ket == KetQuaDangNhap.ThanhCong)
             {
                 Session.TaiKhoan = tk;
-                Session.DonVi = cboDonVi.Text;
+                Session.DonVi = string.IsNullOrWhiteSpace(tk!.DonVi) ? cboDonVi.Text : tk.DonVi!;
                 LuuTenDangNhap(chkNho.Checked ? tk!.TenDangNhap : null);
                 DialogResult = DialogResult.OK;        // đóng form -> Program mở FrmDashboard
             }
             else if (ket == KetQuaDangNhap.TaiKhoanKhoa)
                 HienLoi("Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên để được mở khóa.");
+            else if (ket == KetQuaDangNhap.TamKhoa)
+                HienLoi(thongBao ?? "Tài khoản đang bị khóa tạm thời.");
             else
                 HienLoi("Sai tên đăng nhập hoặc mật khẩu.");
         }
@@ -131,6 +140,7 @@ public class FrmLogin : Form
         {
             System.Diagnostics.Debug.WriteLine(ex);    // xem chi tiết lỗi ở cửa sổ Output của Visual Studio
             HienLoi("Không kết nối được cơ sở dữ liệu.");
+            
         }
         finally
         {
@@ -159,7 +169,7 @@ public class FrmLogin : Form
             Directory.CreateDirectory(Path.GetDirectoryName(LastUserFile)!);
             File.WriteAllText(LastUserFile, ten);
         }
-        catch { /* không lưu được thì bỏ qua */ }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine(ex); }
     }
 
     // ================= DỰNG GIAO DIỆN =================

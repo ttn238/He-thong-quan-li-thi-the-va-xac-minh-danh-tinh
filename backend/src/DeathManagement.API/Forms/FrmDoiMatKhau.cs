@@ -156,9 +156,9 @@ public class FrmDoiMatKhau : Form
     {
         lblThongBao.Visible = false;
 
-        var cu = txtMatKhauCu.Text.Trim();
-        var moi = txtMatKhauMoi.Text.Trim();
-        var xn = txtXacNhan.Text.Trim();
+        var cu = txtMatKhauCu.Text;
+        var moi = txtMatKhauMoi.Text;
+        var xn = txtXacNhan.Text;
 
         if (string.IsNullOrEmpty(cu) || string.IsNullOrEmpty(moi) || string.IsNullOrEmpty(xn))
         {

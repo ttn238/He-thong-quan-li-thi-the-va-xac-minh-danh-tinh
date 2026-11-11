@@ -2,6 +2,7 @@ using DeathManagement.API.Data;
 using DeathManagement.API.Entities;
 using DeathManagement.API.Security;
 using Microsoft.EntityFrameworkCore;
+using static DeathManagement.API.Security.AuthorizationPolicies;
 
 namespace DeathManagement.API.Forms;
 
@@ -173,6 +174,11 @@ public class FrmThemSuaNguoiDung : Form
                     txtChucVu.Text = u.ChucVu ?? "";
                     cboVaiTro.SelectedValue = u.MaVaiTro;
                     cboTrangThai.SelectedItem = u.TrangThai;
+
+                    // Sửa chính mình: không cho đổi vai trò/trạng thái; sửa người khác: đổi vai trò cần PERMISSION:UPDATE
+                    var laChinhMinh = u.MaTaiKhoan == AccessControl.UserId;
+                    cboTrangThai.Enabled = !laChinhMinh;
+                    cboVaiTro.Enabled = !laChinhMinh && AccessControl.Can(ResourcePermission, ActionUpdate);
                 }
             }
         }
@@ -186,11 +192,19 @@ public class FrmThemSuaNguoiDung : Form
     {
         var tenDangNhap = txtTenDangNhap.Text.Trim();
         var hoTen = txtHoTen.Text.Trim();
-        var matKhau = txtMatKhau.Text.Trim();
+        if (!PermissionUi.Check(this, ResourceAccount, _userId.HasValue ? ActionUpdate : ActionCreate)) return;
+        var matKhau = txtMatKhau.Text;
 
-        if (string.IsNullOrEmpty(tenDangNhap) || string.IsNullOrEmpty(hoTen))
+        if (string.IsNullOrWhiteSpace(tenDangNhap))
         {
-            MessageBox.Show("Vui lòng điền đầy đủ Tên đăng nhập và Họ tên.", "Thiếu thông tin", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show("Tên đăng nhập không được để trống.", "Thiếu thông tin", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            txtTenDangNhap.Focus();
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(hoTen))
+        {
+            MessageBox.Show("Họ tên không được để trống.", "Thiếu thông tin", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            txtHoTen.Focus();
             return;
         }
 
@@ -200,11 +214,28 @@ public class FrmThemSuaNguoiDung : Form
             return;
         }
 
+        if (!string.IsNullOrEmpty(matKhau) && matKhau.Length < 6)
+        {
+            MessageBox.Show("Mật khẩu phải có tối thiểu 6 ký tự.", "Thiếu thông tin", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
         try
         {
             using var db = Program.NewDb();
             var maVaiTro = (int)cboVaiTro.SelectedValue!;
             var trangThai = cboTrangThai.SelectedItem?.ToString() ?? "HoatDong";
+
+            var email = string.IsNullOrWhiteSpace(txtEmail.Text) ? null : txtEmail.Text.Trim();
+            var sdt = string.IsNullOrWhiteSpace(txtSoDienThoai.Text) ? null : txtSoDienThoai.Text.Trim();
+            var cccd = string.IsNullOrWhiteSpace(txtCCCD.Text) ? null : txtCCCD.Text.Trim();
+            var idHienTai = _userId ?? 0;
+            if (email != null && await db.Users.AnyAsync(x => x.Email == email && x.MaTaiKhoan != idHienTai))
+            { MessageBox.Show("Email đã được sử dụng bởi tài khoản khác.", "Trùng lặp", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            if (sdt != null && await db.Users.AnyAsync(x => x.SoDienThoai == sdt && x.MaTaiKhoan != idHienTai))
+            { MessageBox.Show("Số điện thoại đã được sử dụng bởi tài khoản khác.", "Trùng lặp", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            if (cccd != null && await db.Users.AnyAsync(x => x.CCCD == cccd && x.MaTaiKhoan != idHienTai))
+            { MessageBox.Show("CCCD đã được sử dụng bởi tài khoản khác.", "Trùng lặp", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
 
             if (!_userId.HasValue)
             {

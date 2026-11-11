@@ -1,4 +1,4 @@
-USE QL_XACMINHTHITHE;
+﻿USE QL_XACMINHTHITHE;
 GO
 SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
@@ -11,17 +11,17 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    IF UPDATE(ThoiGian)
-       AND EXISTS (SELECT 1 FROM inserted WHERE ThoiGian > DATEADD(MINUTE, 5, SYSDATETIME()))
+    IF UPDATE(ThoiGianXayRa)
+       AND EXISTS (SELECT 1 FROM inserted WHERE ThoiGianXayRa > DATEADD(MINUTE, 5, SYSDATETIME()))
     BEGIN
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         THROW 50301, N'Thoi gian tin bao khong duoc nam o tuong lai', 1;
     END
 
     IF UPDATE(TrangThai)
-       AND EXISTS (SELECT 1 FROM inserted i JOIN deleted d ON d.MaTin = i.MaTin
+       AND EXISTS (SELECT 1 FROM inserted i JOIN deleted d ON d.MaTinBao = i.MaTinBao
                    WHERE i.TrangThai <> d.TrangThai
-                     AND fn_ChuyenTrangThaiHopLe('TIN_BAO', d.TrangThai, i.TrangThai) = 0)
+                     AND dbo.fn_ChuyenTrangThaiHopLe('TIN_BAO', d.TrangThai, i.TrangThai) = 0)
     BEGIN
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         THROW 50302, N'Khong cho phep chuyen trang thai tin bao nhu vay', 1;
@@ -54,7 +54,7 @@ BEGIN
     IF UPDATE(TrangThai)
        AND EXISTS (SELECT 1 FROM inserted i JOIN deleted d ON d.MaHoSoThiThe = i.MaHoSoThiThe
                    WHERE i.TrangThai <> d.TrangThai
-                     AND fn_ChuyenTrangThaiHopLe('HO_SO_THI_THE', d.TrangThai, i.TrangThai) = 0)
+                     AND dbo.fn_ChuyenTrangThaiHopLe('HO_SO_THI_THE', d.TrangThai, i.TrangThai) = 0)
     BEGIN
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         THROW 50302, N'Khong cho phep chuyen trang thai ho so thi the nhu vay', 1;
@@ -99,7 +99,7 @@ BEGIN
     IF UPDATE(TrangThai)
        AND EXISTS (SELECT 1 FROM inserted i JOIN deleted d ON d.MaHoSoMatTich = i.MaHoSoMatTich
                    WHERE i.TrangThai <> d.TrangThai
-                     AND fn_ChuyenTrangThaiHopLe('HO_SO_MAT_TICH', d.TrangThai, i.TrangThai) = 0)
+                     AND dbo.fn_ChuyenTrangThaiHopLe('HO_SO_MAT_TICH', d.TrangThai, i.TrangThai) = 0)
     BEGIN
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         THROW 50302, N'Khong cho phep chuyen trang thai ho so mat tich nhu vay', 1;
@@ -157,17 +157,17 @@ BEGIN
     IF UPDATE(TrangThai)
        AND EXISTS (SELECT 1 FROM inserted i JOIN deleted d ON d.MaDoiSanh = i.MaDoiSanh
                    WHERE i.TrangThai <> d.TrangThai
-                     AND fn_ChuyenTrangThaiHopLe('DOI_SANH', d.TrangThai, i.TrangThai) = 0)
+                     AND dbo.fn_ChuyenTrangThaiHopLe('DOI_SANH', d.TrangThai, i.TrangThai) = 0)
     BEGIN
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         THROW 50302, N'Khong cho phep chuyen trang thai doi sanh nhu vay', 1;
     END
 
     IF UPDATE(DiemDoiSanh)
-        UPDATE ds SET MucDoPhuHop = fn_MucDo(i.DiemDoiSanh)
+        UPDATE ds SET MucDoPhuHop = dbo.fn_MucDo(i.DiemDoiSanh)
         FROM DoiSanh ds
         JOIN inserted i ON i.MaDoiSanh = ds.MaDoiSanh
-        WHERE ISNULL(ds.MucDoPhuHop, N'') <> ISNULL(fn_MucDo(i.DiemDoiSanh), N'');
+        WHERE ISNULL(ds.MucDoPhuHop, N'') <> ISNULL(dbo.fn_MucDo(i.DiemDoiSanh), N'');
 END
 GO
 
@@ -225,7 +225,7 @@ BEGIN
 
     IF EXISTS (SELECT 1 FROM inserted i JOIN deleted d ON d.MaXacMinh = i.MaXacMinh
                WHERE i.TrangThai <> d.TrangThai
-                 AND fn_ChuyenTrangThaiHopLe('XAC_MINH', d.TrangThai, i.TrangThai) = 0)
+                 AND dbo.fn_ChuyenTrangThaiHopLe('XAC_MINH', d.TrangThai, i.TrangThai) = 0)
     BEGIN
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         THROW 50302, N'Khong cho phep chuyen trang thai xac minh nhu vay', 1;
@@ -299,7 +299,7 @@ BEGIN
     JOIN deleted d ON d.MaXacMinh = i.MaXacMinh
     JOIN TaiKhoanNguoiDung tk ON tk.MaTaiKhoan <> i.MaTaiKhoanThucHien
     WHERE i.TrangThai = N'ChoDuyet' AND d.TrangThai <> N'ChoDuyet'
-      AND fn_CoQuyen(tk.MaTaiKhoan, 'VERIFICATION', 'APPROVE') = 1;
+      AND dbo.fn_CoQuyen(tk.MaTaiKhoan, 'VERIFICATION', 'APPROVE') = 1;
 
     -- Duyet / tu choi duyet => bao cho nguoi thuc hien
     INSERT ThongBao (NoiDung, MaTaiKhoan)
@@ -337,7 +337,7 @@ BEGIN
 
     IF EXISTS (SELECT 1 FROM inserted i
                WHERE i.TrangThai IN (N'Duyet', N'TuChoi')
-                 AND fn_CoQuyen(i.MaNguoiDuyet, 'VERIFICATION', 'APPROVE') = 0)
+                 AND dbo.fn_CoQuyen(i.MaNguoiDuyet, 'VERIFICATION', 'APPROVE') = 0)
     BEGIN
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         THROW 50311, N'Nguoi duyet khong co quyen duyet hoac tai khoan khong hoat dong', 1;
@@ -395,7 +395,7 @@ BEGIN
         THROW 50315, N'Nguoi nhan khong phai nguoi than cua ho so mat tich nay', 1;
     END
 
-    IF EXISTS (SELECT 1 FROM inserted i WHERE fn_CoQuyen(i.MaNguoiGiao, 'HANDOVER', 'HANDOVER') = 0)
+    IF EXISTS (SELECT 1 FROM inserted i WHERE dbo.fn_CoQuyen(i.MaNguoiGiao, 'HANDOVER', 'HANDOVER') = 0)
     BEGIN
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         THROW 50316, N'Nguoi giao khong co quyen giao thi the', 1;
@@ -413,7 +413,7 @@ BEGIN
 
     IF EXISTS (SELECT 1 FROM inserted i JOIN deleted d ON d.MaBanGiao = i.MaBanGiao
                WHERE i.TrangThai <> d.TrangThai
-                 AND fn_ChuyenTrangThaiHopLe('BAN_GIAO', d.TrangThai, i.TrangThai) = 0)
+                 AND dbo.fn_ChuyenTrangThaiHopLe('BAN_GIAO', d.TrangThai, i.TrangThai) = 0)
     BEGIN
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         THROW 50302, N'Khong cho phep chuyen trang thai ban giao nhu vay', 1;
@@ -473,7 +473,7 @@ AFTER INSERT, UPDATE, DELETE
 AS
 BEGIN
     SET NOCOUNT ON;
-    DECLARE @nguoi BIGINT = fn_NguoiThaoTac();
+    DECLARE @nguoi BIGINT = dbo.fn_NguoiThaoTac();
 
     IF EXISTS (SELECT 1 FROM inserted) AND EXISTS (SELECT 1 FROM deleted)
         INSERT NhatKyHeThong (HanhDong, DoiTuongTacDong, MaTaiKhoan)

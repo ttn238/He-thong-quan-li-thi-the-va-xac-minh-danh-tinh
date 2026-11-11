@@ -38,6 +38,24 @@ public static class PasswordHasher
         if (string.IsNullOrWhiteSpace(hashedPassword) || string.IsNullOrWhiteSpace(password))
             return false;
 
+        // Ho tro mat khau plain-text trong moi truong kiem thu
+        if (hashedPassword.Length == 64 && !hashedPassword.Contains('.'))
+        {
+            var shaBytes = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(password));
+            var shaHex = Convert.ToHexString(shaBytes);
+            if (string.Equals(shaHex, hashedPassword, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        // Ho tro SHA-256 hex tu SQL seed data (HASHBYTES SHA2_256)
+        if (hashedPassword.Length == 64 && !hashedPassword.Contains('.'))
+        {
+            var shaBytes = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(password));
+            var shaHex = Convert.ToHexString(shaBytes);
+            if (string.Equals(shaHex, hashedPassword, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
         var parts = hashedPassword.Split('.');
         if (parts.Length != 3)
             return false;
@@ -62,4 +80,8 @@ public static class PasswordHasher
     /// Alias for VerifyPassword
     /// </summary>
     public static bool Verify(string password, string hashedPassword) => VerifyPassword(password, hashedPassword);
+
+    /// <summary>Hash cũ (SHA-256 seed) hoặc số vòng lặp khác chuẩn hiện tại => nên băm lại bằng PBKDF2</summary>
+    public static bool NeedsRehash(string hashedPassword)
+        => string.IsNullOrEmpty(hashedPassword) || !hashedPassword.StartsWith(Iterations + ".", StringComparison.Ordinal);
 }
