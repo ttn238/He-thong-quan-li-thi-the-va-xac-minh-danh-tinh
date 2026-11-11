@@ -20,9 +20,11 @@ T = TypeVar("T")
 @lru_cache
 def get_ocr_engine() -> OcrEngine:
     s = get_settings()
+    if s.ocr_engine == "vietocr":
+        from app.services.vietocr_engine import VietOcrEngine
+        return VietOcrEngine(model_name=s.vietocr_model, device=s.vietocr_device)
     if s.ocr_engine == "paddle":
-        from app.services.paddle_ocr_engine import PaddleOcrEngine  # import tre: khong bat buoc cai paddle
-
+        from app.services.paddle_ocr_engine import PaddleOcrEngine
         return PaddleOcrEngine(
             lang=s.paddle_lang,
             device=s.paddle_device,

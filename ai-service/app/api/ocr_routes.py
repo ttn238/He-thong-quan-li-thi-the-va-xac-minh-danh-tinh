@@ -5,9 +5,9 @@ from fastapi import APIRouter, Depends, Request
 
 from app.api.deps import get_ocr_engine, read_image_bytes, run_limited, success
 from app.core.config import get_settings
-from app.schemas.ocr_schema import LicensePlateResult
+from app.schemas.ocr_schema import DocumentExtractionResult, LicensePlateResult
 from app.schemas.prediction_schema import ApiResponse
-from app.services.ocr_service import OcrEngine, recognize_plate
+from app.services.ocr_service import OcrEngine, extract_document_info, recognize_plate
 from app.utils.image_processing import decode_image
 
 router = APIRouter(prefix="/api/v1/ocr", tags=["OCR"])
@@ -29,6 +29,26 @@ async def license_plate(
     def job() -> LicensePlateResult:
         image = decode_image(data, settings)
         return recognize_plate(image, engine, settings.ocr_min_confidence)
+
+    result = await run_limited(request, job)
+    return success(request, result)
+
+
+@router.post(
+    "/document",
+    response_model=ApiResponse[DocumentExtractionResult],
+    summary="Trich xuat thong tin giay to tuy than (CCCD/CMND/GPLX) tu anh",
+)
+async def document(
+    request: Request,
+    data: Optional[bytes] = Depends(read_image_bytes),
+    engine: OcrEngine = Depends(get_ocr_engine),
+):
+    settings = request.app.state.settings
+
+    def job() -> DocumentExtractionResult:
+        image = decode_image(data, settings)
+        return extract_document_info(image, engine, settings.ocr_min_confidence)
 
     result = await run_limited(request, job)
     return success(request, result)

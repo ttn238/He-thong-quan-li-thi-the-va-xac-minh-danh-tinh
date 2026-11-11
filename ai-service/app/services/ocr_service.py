@@ -7,8 +7,9 @@ from typing import Optional, Protocol
 
 import numpy as np
 
-from app.schemas.ocr_schema import LicensePlateResult, PlateCandidate
+from app.schemas.ocr_schema import DocumentExtractionResult, LicensePlateResult, PlateCandidate
 from app.schemas.prediction_schema import BoundingBox, ImageInfo
+from app.services.document_extractor import extract_document
 from app.services.image_enhancement import enhance_for_ocr
 from app.services.plate_locator import locate_plate_regions
 from app.services.plate_normalizer import NormalizedPlate, normalize_plate
@@ -171,3 +172,23 @@ def recognize_plate(
         is_valid_format=True,
         candidates=[to_model(c) for c in shown],
     )
+
+
+def extract_document_info(
+    image: LoadedImage, engine: OcrEngine, min_confidence: float = 0.5
+) -> DocumentExtractionResult:
+    """OCR toan anh giay to tuy than roi trich xuat cac truong dinh danh (xem document_extractor).
+    Toa do engine tra ve (tren anh da thu nho) duoc quy ve anh goc."""
+    lines = engine.read(image.bgr)
+    info = ImageInfo(width=image.original_width, height=image.original_height)
+
+    def to_box(b: tuple[float, float, float, float]) -> BoundingBox:
+        x1, y1, x2, y2 = image.to_original_box(*b)
+        return BoundingBox(x_min=x1, y_min=y1, x_max=x2, y_max=y2)
+
+    result = extract_document(lines, info, min_confidence, to_box)
+    logger.info(
+        "document_ocr type=%s valid=%s lines=%d missing=%d",
+        result.document_type, result.is_valid_document, len(lines), len(result.missing_fields),
+    )
+    return result
