@@ -35,7 +35,9 @@ class Settings(BaseSettings):
     ocr_min_confidence: float = Field(0.5, ge=0, le=1)
 
     # Engine OCR: "rapidocr" (mac dinh, ONNX) hoac "paddle" (PaddleOCR, can requirements-paddle.txt)
-    ocr_engine: Literal["rapidocr", "paddle"] = "rapidocr"
+    ocr_engine: Literal["rapidocr", "paddle", "vietocr"] = "rapidocr"
+    vietocr_model: str = "vgg_transformer"
+    vietocr_device: str = "cpu"
     paddle_lang: str = "en"
     paddle_device: str = "cpu"  # "cpu" hoac "gpu:0" (GPU chua kiem thu)
     paddle_det_model: Optional[str] = None  # vi du PP-OCRv5_mobile_det (chua kiem thu), None = mac dinh
