@@ -53,12 +53,19 @@ class MissingField(CamelModel):
 
 
 class ImageInfo(CamelModel):
-    file_name: str
-    size_bytes: int
-    format: str
+    file_name: Optional[str] = None
+    size_bytes: Optional[int] = None
+    format: Optional[str] = None
     width: int
     height: int
-    url: str
+    url: Optional[str] = None
+
+
+class ImageAnalysisResult(CamelModel):
+    """Ket qua YOLO tren anh goc, dung chung cho API phan tich nhanh."""
+    image: ImageInfo
+    objects: list[DetectedObject] = Field(default_factory=list)
+    summary: dict[str, int] = Field(default_factory=dict)
 
 
 class ReviewIn(CamelModel):

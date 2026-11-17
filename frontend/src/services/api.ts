@@ -2,10 +2,8 @@
 //   - ApiClient.get/post/put/delete   (userService, ...)
 //   - post(...) và ApiError           (authService, Login)
 
-// Địa chỉ gốc. Mặc định đi qua proxy của Vite (/api -> backend, /ai -> dịch vụ AI).
-// Khi triển khai thật: đặt VITE_API_URL / VITE_AI_API_URL trong .env.production.
+// Địa chỉ gốc của backend; mọi lời gọi AI đi qua backend để kiểm tra quyền.
 const API_BASE_URL: string = import.meta.env.VITE_API_URL ?? '/api/v1';
-export const AI_API_URL: string = import.meta.env.VITE_AI_API_URL ?? '/ai';
 
 const SESSION_KEY = 'qltldt.session';
 
@@ -50,6 +48,7 @@ async function readMessage(res: Response): Promise<string> {
         const d = await res.json();
         if (typeof d?.message === 'string') return d.message;   // backend .NET
         if (typeof d?.detail === 'string') return d.detail;     // FastAPI
+        if (typeof d?.error?.message === 'string') return d.error.message;
         if (typeof d?.title === 'string') return d.title;       // ProblemDetails
     } catch {
         /* không có JSON */
@@ -95,6 +94,22 @@ export class ApiClient {
 
         if (res.status === 204 || res.headers.get('content-length') === '0') return {} as T;
         return (await res.json()) as T;
+    }
+
+    public static async getBlob(endpoint: string, baseUrl: string = API_BASE_URL): Promise<Blob> {
+        const token = getToken();
+        const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`;
+        let res: Response;
+        try {
+            res = await fetch(url, { headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
+        } catch {
+            throw new ApiError(0, 'Không kết nối được máy chủ.');
+        }
+        if (!res.ok) {
+            if (res.status === 401 && token) clearSession();
+            throw new ApiError(res.status, await readMessage(res));
+        }
+        return res.blob();
     }
 
     public static get<T = any>(endpoint: string, params?: Record<string, any>, baseUrl?: string): Promise<T> {

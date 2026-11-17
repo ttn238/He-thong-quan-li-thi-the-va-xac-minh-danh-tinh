@@ -1,142 +1,169 @@
+"""Ket qua phan tich anh: OCR + YOLO, luu ket qua va anh theo request id."""
+import hashlib
+import logging
 import re
-import time
+import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 
-from app.core.config import DATA_DIR, ENGINE_NAME, MAX_UPLOAD_BYTES
+from app.api.deps import get_detector, get_ocr_engine, run_limited
+from app.core.errors import AppError, ImageTooLargeError, ModelUnavailableError
 from app.schemas.prediction_schema import (
-    AiResultOut, ImageInfo, MissingField, ReviewIn, ReviewRecord,
+    AiResultOut, ImageInfo, MissingField, OcrItem, ReviewIn, ReviewRecord,
 )
-from app.services.ocr_service import run_ocr
-from app.utils.image_processing import EXT, MEDIA, read_and_validate, sha256_hex
+from app.services.object_detection import analyze_image
+from app.utils.image_processing import decode_image
 
 router = APIRouter(prefix="/v1/results", tags=["ai-results"])
-
-_ID = re.compile(r"^AI-REQ-\d{8}-[0-9A-F]{8}$")   # chặn path traversal
+logger = logging.getLogger(__name__)
+_ID = re.compile(r"^AI-REQ-\d{8}-[0-9A-F]{8}$")
+_LOCK = threading.Lock()
+_EXT = {"JPEG": "jpg", "PNG": "png", "WEBP": "webp", "BMP": "bmp"}
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
 
 
-def _check_id(request_id: str) -> str:
-    if not _ID.match(request_id):
+def _data_dir(request: Request) -> Path:
+    path = request.app.state.settings.data_dir.resolve()
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _checked_id(request_id: str) -> str:
+    if not _ID.fullmatch(request_id):
         raise HTTPException(400, "Mã yêu cầu không hợp lệ.")
     return request_id
 
 
-def _json_path(request_id: str) -> Path:
-    return DATA_DIR / f"{request_id}.json"
-
-
-def _save(result: AiResultOut) -> None:
-    path = _json_path(result.request_id)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(result.model_dump_json(by_alias=True), encoding="utf-8")
-    tmp.replace(path)
-
-
-def _load(request_id: str) -> AiResultOut:
-    path = _json_path(_check_id(request_id))
-    if not path.exists():
+def _load(request: Request, request_id: str) -> AiResultOut:
+    path = _data_dir(request) / f"{_checked_id(request_id)}.json"
+    if not path.is_file():
         raise HTTPException(404, "Không tìm thấy kết quả phân tích.")
-    return AiResultOut.model_validate_json(path.read_text(encoding="utf-8"))
+    try:
+        return AiResultOut.model_validate_json(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        logger.exception("Stored AI result could not be read")
+        raise HTTPException(500, "Không đọc được kết quả phân tích.")
 
 
-def _find_image(request_id: str) -> Path:
-    for ext in EXT.values():
-        p = DATA_DIR / f"{request_id}.{ext}"
-        if p.exists():
-            return p
-    raise HTTPException(404, "Không tìm thấy ảnh.")
+def _save(request: Request, result: AiResultOut) -> None:
+    path = _data_dir(request) / f"{result.request_id}.json"
+    temp = path.with_suffix(".tmp")
+    with _LOCK:
+        temp.write_text(result.model_dump_json(by_alias=True), encoding="utf-8")
+        temp.replace(path)
 
 
 @router.post("", response_model=AiResultOut, response_model_by_alias=True)
-def analyze(file: UploadFile = File(...), linked_record_id: Optional[str] = Form(None)):
-    data = file.file.read(MAX_UPLOAD_BYTES + 1)
-    img, fmt = read_and_validate(data)
-
+async def analyze(
+    request: Request,
+    file: UploadFile = File(...),
+    linked_record_id: Optional[str] = Form(None),
+):
+    settings = request.app.state.settings
+    data = await file.read(int(settings.max_image_mb * 1024 * 1024) + 1)
+    if len(data) > settings.max_image_mb * 1024 * 1024:
+        raise ImageTooLargeError(f"Ảnh vượt quá {settings.max_image_mb:g} MB")
+    image = decode_image(data, settings)
     request_id = f"AI-REQ-{datetime.now():%Y%m%d}-{uuid.uuid4().hex[:8].upper()}"
-    ext = EXT[fmt]
-    (DATA_DIR / f"{request_id}.{ext}").write_bytes(data)
-
-    result = AiResultOut(
-        request_id=request_id,
-        status="processing",
-        linked_record_id=(linked_record_id or "").strip() or None,
-        submitted_at=_now(),
-        engine=ENGINE_NAME,
-        image_hash=sha256_hex(data),
-        image=ImageInfo(
-            file_name=Path(file.filename or f"anh.{ext}").name,
-            size_bytes=len(data), format=fmt, width=img.width, height=img.height,
-            url=f"/v1/results/{request_id}/image",
-        ),
+    ext = _EXT.get(image_format := _image_format(data), "jpg")
+    safe_name = Path(file.filename or f"image.{ext}").name[:180]
+    data_dir = _data_dir(request)
+    (data_dir / f"{request_id}.{ext}").write_bytes(data)
+    image_info = ImageInfo(
+        file_name=safe_name, size_bytes=len(data), format=image_format,
+        width=image.original_width, height=image.original_height,
+        url=f"/v1/results/{request_id}/image",
     )
 
-    started = time.perf_counter()
+    detector, ocr_engine = get_detector(), get_ocr_engine()
+
+    def process():
+        vision = analyze_image(image, detector)
+        text_items: list[OcrItem] = []
+        try:
+            for line in ocr_engine.read(image.bgr):
+                if not line.text.strip():
+                    continue
+                x1, y1, x2, y2 = image.to_original_box(*line.box)
+                text_items.append(OcrItem(
+                    text=line.text.strip(), kind="other",
+                    confidence=min(1.0, max(0.0, line.confidence)),
+                    bbox={"xMin": x1, "yMin": y1, "xMax": x2, "yMax": y2},
+                ))
+        except Exception:
+            logger.exception("OCR failed for request %s", request_id)
+        return vision.objects, text_items
+
     try:
-        items = run_ocr(img)
-        plate = next((i for i in items if i.kind == "license_plate"), None)
-        result.ocr = items
-        result.missing_fields = [
-            MissingField(
-                field="Biển số phương tiện (OCR)",
-                status="done" if plate else "missing",
-                value=f"{plate.text} ({plate.confidence * 100:.1f}%)" if plate else None,
-                recommendation=None if plate else "Không đọc được biển số; chụp bổ sung ảnh cận biển số.",
-            ),
-            MissingField(
-                field="Nhận diện đối tượng / đặc điểm",
-                status="unsupported",
-                recommendation="Chưa tích hợp mô hình nhận diện đối tượng; cán bộ mô tả thủ công.",
-            ),
-            MissingField(
-                field="Địa điểm suy luận",
-                status="unsupported",
-                recommendation="Chưa tích hợp dữ liệu bản đồ; cán bộ xác định địa điểm thủ công.",
-            ),
-        ]
-        result.status = "completed"
-    except Exception as exc:  # noqa: BLE001 - lưu lỗi để giao diện hiển thị trạng thái lỗi
-        result.status = "failed"
-        result.error = {
-            "code": "ERR_AI_OCR_FAILED",
-            "message": "Không thể phân tích ảnh bằng động cơ OCR.",
-            "traceId": uuid.uuid4().hex[:16],
-            "occurredAt": _now(),
-        }
-        print(f"[ai-service] OCR failed for {request_id}: {exc!r}")
-    result.completed_at = _now()
-    result.duration_ms = int((time.perf_counter() - started) * 1000)
-    _save(result)
+        objects, text_items = await run_limited(request, process)
+    except AppError:
+        raise
+    except Exception as exc:
+        logger.exception("Image analysis failed for request %s", request_id)
+        raise ModelUnavailableError("Không thể phân tích ảnh lúc này.") from exc
+
+    result = AiResultOut(
+        request_id=request_id, status="completed", linked_record_id=(linked_record_id or "").strip()[:120] or None,
+        submitted_at=_now(), completed_at=_now(), engine="YOLOv8n (COCO) + RapidOCR",
+        image_hash=hashlib.sha256(data).hexdigest(), image=image_info,
+        ocr=text_items, objects=objects,
+        missing_fields=[
+            MissingField(field="Văn bản/OCR", status="done" if text_items else "missing",
+                         recommendation=None if text_items else "Không phát hiện văn bản rõ; kiểm tra ảnh thủ công."),
+            MissingField(field="Đối tượng trong ảnh", status="done" if objects else "missing",
+                         recommendation=None if objects else "YOLO không phát hiện đối tượng thuộc các lớp hỗ trợ."),
+            MissingField(field="Địa điểm suy luận", status="unsupported",
+                         recommendation="Chưa có dữ liệu bản đồ để suy luận địa điểm."),
+        ],
+    )
+    _save(request, result)
     return result
 
 
+def _image_path(request: Request, request_id: str) -> Path:
+    _load(request, request_id)
+    base = _data_dir(request)
+    for ext in _EXT.values():
+        path = base / f"{request_id}.{ext}"
+        if path.is_file():
+            return path
+    raise HTTPException(404, "Không tìm thấy ảnh.")
+
+
 @router.get("/{request_id}", response_model=AiResultOut, response_model_by_alias=True)
-def get_result(request_id: str):
-    return _load(request_id)
+def get_result(request_id: str, request: Request):
+    return _load(request, request_id)
 
 
 @router.get("/{request_id}/image")
-def get_image(request_id: str):
-    _load(request_id)  # kiểm tra id hợp lệ + tồn tại
-    path = _find_image(request_id)
-    return FileResponse(path, media_type=MEDIA[path.suffix.lstrip(".")])
+def get_image(request_id: str, request: Request):
+    path = _image_path(request, request_id)
+    media = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp", "bmp": "image/bmp"}[path.suffix[1:]]
+    return FileResponse(path, media_type=media)
 
 
 @router.post("/{request_id}/review", response_model=ReviewRecord, response_model_by_alias=True)
-def save_review(request_id: str, body: ReviewIn):
-    result = _load(request_id)
+def save_review(request_id: str, body: ReviewIn, request: Request):
+    result = _load(request, request_id)
     if result.status != "completed":
         raise HTTPException(409, "Chỉ thẩm định được kết quả đã phân tích xong.")
     if body.decision != "confirm" and not body.note.strip():
         raise HTTPException(400, "Cần ghi chú lý do khi không xác nhận kết quả.")
     result.review = ReviewRecord(**body.model_dump(), reviewed_at=_now())
-    _save(result)
+    _save(request, result)
     return result.review
+
+
+def _image_format(data: bytes) -> str:
+    from io import BytesIO
+    from PIL import Image
+    with Image.open(BytesIO(data)) as image:
+        return (image.format or "JPEG").upper()

@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     app_name: str = "ai-service"
     app_version: str = "1.0.0"
     log_level: str = "INFO"
+    data_dir: Path = BASE_DIR / "data"
 
     # --- Dau vao anh ---
     max_image_mb: float = Field(10.0, gt=0, description="Dung luong anh toi da (MB)")
@@ -35,6 +36,7 @@ class Settings(BaseSettings):
     ocr_min_confidence: float = Field(0.5, ge=0, le=1)
 
     # --- Nhan dien doi tuong ---
+    # The official pretrained COCO weight is downloaded on first load if it is not present.
     detector_weights: Path = BASE_DIR / "models" / "image_model" / "yolov8n.pt"
     detector_min_confidence: float = Field(0.35, ge=0, le=1)
     detector_max_objects: int = Field(50, ge=1)

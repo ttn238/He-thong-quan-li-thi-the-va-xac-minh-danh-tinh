@@ -12,6 +12,7 @@ static class Program
     internal static readonly IConfigurationRoot Config = new ConfigurationBuilder()
         .SetBasePath(AppContext.BaseDirectory)
         .AddJsonFile("appsettings.json")
+        .AddEnvironmentVariables()
         .Build();
 
     // ĐĂNG KÝ "policy" ở tầng dữ liệu: interceptor kiểm tra quyền cho MỌI lệnh ghi

@@ -1,6 +1,7 @@
 """Nhan dien nguoi va phuong tien bang YOLOv8 (COCO). Cac dac diem nhu hinh xam, seo
 can mo hinh huan luyen rieng: dat trong app/models/image_model va mo rong tai day."""
 import logging
+import shutil
 import threading
 from dataclasses import dataclass
 from pathlib import Path
@@ -49,11 +50,25 @@ class YoloDetector:
         if self._model is None:
             with self._lock:
                 if self._model is None:
-                    if not self._weights.is_file():
-                        raise ModelUnavailableError("Chua co file trong so mo hinh nhan dien")
                     from ultralytics import YOLO
-
-                    self._model = YOLO(str(self._weights))
+                    try:
+                        if self._weights.is_file():
+                            self._model = YOLO(str(self._weights))
+                        elif self._weights.name == "yolov8n.pt":
+                            # Ultralytics fetches its official COCO pretrained asset when passed its model name.
+                            self._model = YOLO("yolov8n.pt")
+                            source = Path(getattr(self._model, "ckpt_path", ""))
+                            if source.is_file() and source.resolve() != self._weights.resolve():
+                                self._weights.parent.mkdir(parents=True, exist_ok=True)
+                                try:
+                                    shutil.copy2(source, self._weights)
+                                except OSError:
+                                    logger.warning("Could not cache YOLO weights under configured model directory")
+                        else:
+                            self._model = YOLO(str(self._weights))
+                    except Exception as exc:
+                        logger.exception("YOLO model load failed")
+                        raise ModelUnavailableError("Khong nap duoc mo hinh YOLOv8n") from exc
 
     def detect(self, bgr: np.ndarray) -> list[RawDetection]:
         self.load()

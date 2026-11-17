@@ -1,42 +1,25 @@
-﻿import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import AiResultView from '../../components/ai-result/AiResultView';
-import { AI_MOCK_ENABLED } from '../../services/aiResultService';
-import type { MockScenario } from '../../services/aiResultMock';
-import type { AiReview, SuggestedLocation } from '../../types/AiResult';
-
-const SCENARIOS: { value: MockScenario; label: string }[] = [
-    { value: 'processing', label: '1. Đang xử lý' },
-    { value: 'success', label: '2. Hoàn thành có kết quả' },
-    { value: 'empty', label: '3. Không có kết quả' },
-    { value: 'error', label: '4. Lỗi dịch vụ 504' },
-    { value: 'partial', label: '5. Dữ liệu khuyết thiếu' },
-    { value: 'retrying', label: '6. Đang thử lại' },
-];
+import AiUploadBox from '../../components/ai-result/AiUploadBox';
+import { S } from '../../components/ai-result/aiResultStyles';
+import { authService } from '../../services/authService';
 
 export default function AiResultPage() {
-    const { requestId = 'AI-REQ-20261014-089' } = useParams();
-    const [scenario, setScenario] = useState<MockScenario>('success');
-
-    // TẠM: chưa có API ghi vào hồ sơ / lưu biên bản nên chỉ ghi log
-    const apDungDiaDiem = (l: SuggestedLocation) => { console.log('Áp dụng địa điểm', l); alert('Chưa nối API ghi vào hồ sơ (chỉ ghi log).'); };
-    const luuBienBan = (r: AiReview) => { console.log('Biên bản thẩm định', r); };
-
-    return (
-        <div className= "ai-page" >
-        <h2>Phân tích AI & Đối chiếu · #{ requestId } </h2>
-    {
-        AI_MOCK_ENABLED && (
-            <div className="ai-mock-switch" >
-                Dữ liệu mẫu(chỉ để kiểm tra giao diện): { ' ' }
-        <select value={ scenario } onChange = {(e) => setScenario(e.target.value as MockScenario)
-    }>
-    { SCENARIOS.map((s) => <option key={ s.value } value = { s.value } > { s.label } </option>) }
-        </select>
+    const { requestId } = useParams();
+    const navigate = useNavigate();
+    const roleId = authService.getSession()?.user.maVaiTro;
+    const canAccessAi = roleId === 1 || roleId === 2 || roleId === 3;
+    return <main className="mx-auto max-w-300 px-4 py-4 md:px-6">
+        <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="m-0 text-xl font-bold text-navy">Phân tích ảnh & kết quả AI{requestId ? ` · #${requestId}` : ''}</h2>
+            {requestId && <button className={S.btnGhost} onClick={() => navigate('/identification/ai-result')}>Phân tích ảnh khác</button>}
         </div>
-      )
-}
-<AiResultView requestId={ requestId } scenario = { scenario } onApplyLocation = { apDungDiaDiem } onSaveReview = { luuBienBan } />
-    </div>
-  );
+        {!canAccessAi
+            ? <p className="rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
+                Tài khoản hiện tại chưa được cấp quyền phân tích ảnh hoặc xem kết quả AI.
+            </p>
+            : requestId
+            ? <AiResultView key={requestId} requestId={requestId} />
+            : <AiUploadBox onUploaded={(id) => navigate(`/identification/ai-result/${id}`)} />}
+    </main>;
 }

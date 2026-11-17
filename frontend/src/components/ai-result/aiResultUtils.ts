@@ -17,7 +17,7 @@ export const dt = (iso?: string) => {
     return Number.isNaN(d.getTime()) ? NO_DATA : d.toLocaleString('vi-VN');
 };
 
-export const bboxText = (b?: BBox) => (b ? `[${b.join(', ')}]` : 'Không có tọa độ');
+export const bboxText = (b?: BBox) => (b ? `[${b.xMin}, ${b.yMin}, ${b.xMax}, ${b.yMax}]` : 'Không có tọa độ');
 
 export function layViewState(
     data: AiResult | null,

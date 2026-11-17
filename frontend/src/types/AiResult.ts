@@ -1,5 +1,5 @@
 ﻿// Hợp đồng JSON do dịch vụ AI (ai-service) trả về. Tên trường là camelCase.
-export type BBox = [number, number, number, number]; // [x, y, rộng, cao] theo pixel ảnh gốc
+export interface BBox { xMin: number; yMin: number; xMax: number; yMax: number }
 
 export interface OcrItem {
     text: string;
@@ -11,10 +11,10 @@ export interface OcrItem {
 
 export interface DetectedObject {
     label: string;
-    description?: string;
+    category: 'person' | 'vehicle';
     confidence: number; // 0..1
-    bbox?: BBox;
-    tag?: string;
+    box: BBox;
+    attributes: Record<string, string>;
 }
 
 export interface SuggestedLocation {
