@@ -52,3 +52,17 @@ class LocationSearchResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     attribution: str
     notice: str
+
+
+class DocumentLocationResult(BaseModel):
+    """OCR giay to -> lay truong dia chi -> tra cuu dia diem. Van chi la goi y, chua xac minh."""
+
+    document_type: str
+    source_field: Optional[Literal["residence", "hometown"]] = Field(
+        None, description="Truong OCR da dung lam dia chi (uu tien noi cu tru, sau do que quan)"
+    )
+    address_text: Optional[str] = Field(None, description="Chuoi dia chi OCR dua vao tra cuu")
+    extraction_confidence: float = Field(0.0, ge=0, le=1, description="Do tin cay OCR cua truong dia chi")
+    address_found: bool = Field(description="False neu OCR khong doc duoc truong dia chi nao")
+    location: Optional[LocationSearchResult] = Field(None, description="None khi khong co dia chi de tra cuu")
+    warnings: list[str] = Field(default_factory=list)

@@ -170,3 +170,21 @@ Backend image API mặc định nghe tại cổng `5000`, AI Service tại `8000
 - Kết quả trùng (cùng tọa độ hoặc cùng tên) được gộp; xếp theo `similarity` rồi `importance`.
 - Nguồn tra cứu mặc định là Nominatim công cộng của OpenStreetMap: tối đa 1 yêu cầu/giây trên toàn dịch vụ, có cache (24 giờ; "không tìm thấy" 5 phút), tạm ngưng gọi 60 giây sau khi bị 429/403/5xx hoặc lỗi mạng. Phù hợp demo/lưu lượng nhỏ; triển khai thật nên dùng máy chủ Nominatim riêng (`AI_GEOCODER_BASE_URL`).
 - **Quyền riêng tư:** chính sách Nominatim công cộng không cho phép gửi dữ liệu cá nhân/tài liệu mật, và chuỗi địa điểm được gửi ra dịch vụ bên ngoài. Chỉ gửi chuỗi địa điểm (không kèm tên, CCCD, mã hồ sơ); cân nhắc việc gửi địa điểm của hồ sơ thi thể ra ngoài trước khi bật. Log của dịch vụ không ghi chuỗi địa chỉ.
+
+#### 2.9.1. Tra cứu địa điểm từ ảnh giấy tờ (`POST /api/v1/location/from-document`)
+
+Nhận **ảnh giấy tờ tùy thân** (`multipart/form-data`: `file` hoặc `image_path`, giống `/api/v1/ocr/document`), OCR, lấy trường **nơi cư trú** (`residence`), nếu không có thì **quê quán** (`hometown`), rồi tra cứu như `/location/search`. Kết quả vẫn là gợi ý, `verified` luôn `false`.
+
+`data`:
+
+| Trường | Kiểu | Mô tả |
+|---|---|---|
+| `document_type` | string | `cccd` / `cmnd` / `driver_license` / `unknown` |
+| `address_found` | bool | `false` nếu OCR không đọc được trường địa chỉ nào |
+| `source_field` | `residence` \| `hometown` \| null | Trường OCR được dùng |
+| `address_text` | string \| null | Chuỗi địa chỉ OCR đưa vào tra cứu (để người dùng đối chiếu với giấy tờ) |
+| `extraction_confidence` | number 0–1 | Độ tin cậy OCR của trường địa chỉ |
+| `location` | object \| null | Cùng cấu trúc `data` của `/location/search`; `null` khi `address_found=false` |
+| `warnings` | string[] | Ví dụ: không đọc được địa chỉ; độ tin cậy OCR thấp (< 0.7) |
+
+Trường hợp không tìm thấy: `address_found=false` (kèm `warnings`, `location=null`) hoặc `location.found=false` (không có gợi ý). Lỗi dùng chung mã của `/location/search` (`GEOCODING_DISABLED`, `GEOCODING_UNAVAILABLE`, ...) và của OCR (ảnh không hợp lệ, quá lớn).
