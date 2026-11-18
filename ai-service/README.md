@@ -213,3 +213,20 @@ uvicorn main:app --host 127.0.0.1 --port 8000
 Biến cấu hình: `AI_OCR_ENGINE`, `AI_PADDLE_LANG` (en), `AI_PADDLE_DEVICE` (cpu), `AI_PADDLE_DET_MODEL`, `AI_PADDLE_REC_MODEL`, `AI_PADDLE_RETRY_COOLDOWN_S`.
 
 Lưu ý: nếu nạp PaddleOCR thất bại (thiếu thư viện, không tải được mô hình) API trả `503 MODEL_UNAVAILABLE`, không làm sập service. Kết quả OCR chưa được xác minh. Xem `docs/reports/5.6-paddleocr-integration-report.md`.
+
+## 7. Tra cứu địa điểm từ chuỗi OCR / địa chỉ nhập tay
+
+`POST /api/v1/location/search` nhận một chuỗi địa điểm và trả về **danh sách gợi ý** (tên/địa chỉ, tọa độ, mức khớp, độ giống, liên kết OpenStreetMap). Kết quả luôn `verified=false`. Đặc tả request/response và mã lỗi: `docs/api/api-documentation.md` mục 2.9.
+
+```bash
+curl -X POST http://localhost:8000/api/v1/location/search \
+  -H "Content-Type: application/json" \
+  -d '{"text": "12 Nguyễn Huệ, P. Bến Nghé, Q.1, TPHCM"}'
+```
+
+Các file: `app/services/address_normalizer.py` (chuẩn hóa, ghép dòng OCR thành địa chỉ bằng `address_text_from_ocr_lines`), `app/services/geocoding_provider.py` (Nominatim, giới hạn tốc độ, cache, cooldown), `app/services/location_service.py` (thử đầy đủ → rút gọn, xếp hạng, loại trùng), `app/api/location_routes.py`.
+
+- **Nguồn:** Nominatim công cộng của OpenStreetMap (miễn phí, không cần key). Chính sách: ≤ 1 yêu cầu/giây, User-Agent định danh, bắt buộc cache, không autocomplete, không gửi dữ liệu cá nhân/mật. **Đặt `AI_GEOCODER_USER_AGENT` kèm thông tin liên hệ** (xem `env.example`). Chính sách có thể đổi: đọc lại https://operations.osmfoundation.org/policies/nominatim/ trước khi triển khai thật. Tắt bằng `AI_GEOCODER_ENABLED=false`, đổi sang máy chủ riêng bằng `AI_GEOCODER_BASE_URL`.
+- **Không thêm thư viện:** gọi mạng bằng `urllib` của Python.
+- **Lấy địa chỉ từ ảnh giấy tờ:** `POST /api/v1/location/from-document` OCR giấy tờ (`extract_document_info`), lấy `residence` (hoặc `hometown`) rồi tra cứu; không đọc được địa chỉ thì trả `address_found=false`. Xem `docs/api/api-documentation.md` mục 2.9.1. Các dòng OCR rời (không phải giấy tờ) vẫn dùng `address_text_from_ocr_lines`.
+- **Kiểm thử:** `python -m pytest tests/test_address_normalizer.py tests/test_geocoding_provider.py tests/test_location_service.py -q`. Các test dùng provider/`fetch`/đồng hồ giả, **không gọi mạng thật**, nên chưa chứng minh Nominatim thật trả đúng địa chỉ Việt Nam.

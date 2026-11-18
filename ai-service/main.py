@@ -13,7 +13,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api import image_routes, ocr_routes
+from app.api import image_routes, location_routes, ocr_routes, plate_routes
 from app.api.deps import get_detector, get_ocr_engine
 from app.core.config import get_settings
 from app.core.errors import AppError
@@ -99,7 +99,9 @@ def create_app() -> FastAPI:
         return {"status": "ok", "service": settings.app_name, "version": settings.app_version}
 
     app.include_router(ocr_routes.router)
+    app.include_router(plate_routes.router)
     app.include_router(image_routes.router)
+    app.include_router(location_routes.router)
     return app
 
 app = create_app()
