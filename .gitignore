@@ -62,3 +62,12 @@ appsettings.local.json
 uploads/
 private_images/
 App_Data/
+
+ai-service/data/
+ai-service/app/data/
+ai-service/app/models/image_model/*.pt
+ai-service/.venv/
+ai-service/.uv-cache/
+ai-service/.ultralytics/
+ai-service/pytest-cache-files-*/
+ai-service/tests/.test-data/

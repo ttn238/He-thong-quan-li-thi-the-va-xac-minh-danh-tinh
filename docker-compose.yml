@@ -14,16 +14,16 @@ services:
   # Backend .NET API
   backend:
     build:
-      context: ./backend
-      dockerfile: src/DeathManagement.API/Dockerfile
-    container_name: death_management_api
+      context: ./backend/src/DeathManagement.ImageApi
+      dockerfile: Dockerfile
+    container_name: death_management_image_api
     ports:
       - "5000:8080"
-    depends_on:
-      - database
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Server=database;Database=DeathManagementDb;User Id=sa;Password=YourStrongPassword123!;TrustServerCertificate=True;
+      - ASPNETCORE_ENVIRONMENT=Production
+      - Jwt__Key=${JWT_KEY:?Set JWT_KEY to the same 32+ character key used by the desktop app}
+      - AiService__BaseUrl=http://ai-service:8000
+      - AiService__TimeoutSeconds=45
 
   # AI Service (Python FastAPI)
   ai-service:
@@ -31,10 +31,14 @@ services:
       context: ./ai-service
       dockerfile: Dockerfile
     container_name: death_management_ai
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     environment:
       - ENVIRONMENT=development
+      - AI_DATA_DIR=/app/app/data
+    volumes:
+      - ai_data:/app/app/data
+      - ai_models:/app/app/models/image_model
 
   # Frontend (React Vite)
   frontend:
@@ -49,3 +53,5 @@ services:
 
 volumes:
   db_data:
+  ai_data:
+  ai_models:

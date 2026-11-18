@@ -680,3 +680,26 @@ BEGIN
     VALUES (CONCAT(N'XOA_HINH_ANH#', @MaHinhAnh), CONCAT(N'HinhAnh#', @MaHinhAnh), @MaTaiKhoan);
 END
 GO 
+
+CREATE OR ALTER PROCEDURE sp_TaoTinBao
+    @MaLoaiTinBao INT, @TieuDe NVARCHAR(200), @NoiDung NVARCHAR(MAX),
+    @ThoiGianXayRa DATETIME2, @DiaDiem NVARCHAR(500), @NguonTin NVARCHAR(20),
+    @HoTenNguoiBao NVARCHAR(150) = NULL, @SoDienThoaiNguoiBao VARCHAR(20) = NULL,
+    @MaTaiKhoanTiepNhan BIGINT, @MucDoUuTien NVARCHAR(20),
+    @MaTinBaoMoi INT OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON; SET XACT_ABORT ON;
+    IF dbo.fn_CoQuyen(@MaTaiKhoanTiepNhan, 'INCIDENT', 'CREATE') = 0
+        THROW 50403, N'Tai khoan khong co quyen tao tin bao.', 1;
+
+    INSERT INTO TinBao (MaLoaiTinBao, TieuDe, NoiDung, ThoiGianXayRa, DiaDiem, NguonTin,
+                        HoTenNguoiBao, SoDienThoaiNguoiBao, MaTaiKhoanTiepNhan, MucDoUuTien)
+    VALUES (@MaLoaiTinBao, @TieuDe, @NoiDung, @ThoiGianXayRa, @DiaDiem, @NguonTin,
+            @HoTenNguoiBao, @SoDienThoaiNguoiBao, @MaTaiKhoanTiepNhan, @MucDoUuTien);
+
+    SET @MaTinBaoMoi = SCOPE_IDENTITY();
+    INSERT INTO NhatKyHeThong (HanhDong, DoiTuongTacDong, MaTaiKhoan)
+    VALUES (CONCAT(N'TAO_TIN_BAO#', @MaTinBaoMoi), CONCAT(N'TinBao#', @MaTinBaoMoi), @MaTaiKhoanTiepNhan);
+END
+GO

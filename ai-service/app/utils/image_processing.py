@@ -18,6 +18,23 @@ from app.core.errors import (
     UnsupportedMediaError,
 )
 
+# Ultralytics patches PIL.Image.open to dynamically install a HEIF plugin for unknown files.
+# Keep Pillow's original opener for untrusted upload validation so a bad image can never
+# trigger runtime package installation or a long network wait.
+_PIL_OPEN = Image.open
+
+
+def _sniff_format(data: bytes) -> Optional[str]:
+    if data.startswith(b"\xff\xd8\xff"):
+        return "JPEG"
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "PNG"
+    if len(data) >= 12 and data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+        return "WEBP"
+    if data.startswith(b"BM"):
+        return "BMP"
+    return None
+
 
 @dataclass
 class LoadedImage:
@@ -64,9 +81,17 @@ def decode_image(data: Optional[bytes], settings: Settings) -> LoadedImage:
     if len(data) > settings.max_image_mb * 1024 * 1024:
         raise ImageTooLargeError(f"Anh vuot qua {settings.max_image_mb:g} MB")
 
+    signature_format = _sniff_format(data)
+    if signature_format is None:
+        raise InvalidImageError("Tep khong phai anh hop le")
+    if signature_format not in settings.allowed_formats:
+        raise UnsupportedMediaError(
+            "Dinh dang anh khong ho tro. Cho phep: " + ", ".join(settings.allowed_formats)
+        )
+
     # Kiem tra dinh dang that su bang noi dung, khong tin Content-Type/duoi file
     try:
-        with Image.open(io.BytesIO(data)) as pil:
+        with _PIL_OPEN(io.BytesIO(data)) as pil:
             fmt = (pil.format or "").upper()
             w, h = pil.size
     except Exception:

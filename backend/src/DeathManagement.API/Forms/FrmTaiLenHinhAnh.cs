@@ -231,6 +231,25 @@ public class FrmTaiLenHinhAnh : Form
         Controls.Add(pnlHeader);
     }
 
+    // Bật kéo-thả cho một control (gọi cho form, panel nền, ô xem trước...)
+    private void BatKeoTha(Control c)
+    {
+        c.AllowDrop = true;
+        c.DragEnter += (_, e) => e.Effect = e.Data?.GetDataPresent(DataFormats.FileDrop) == true
+            ? DragDropEffects.Copy : DragDropEffects.None;
+        c.DragDrop += (_, e) =>
+        {
+            if (e.Data?.GetData(DataFormats.FileDrop) is not string[] files || files.Length == 0) return;
+            if (files.Length > MaxSoAnh)
+            {
+                MessageBox.Show($"Chỉ được kéo-thả tối đa {MaxSoAnh} ảnh mỗi lần.", "Vượt quá số lượng cho phép",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            XuLyDanhSachAnhKeoTha(files);
+        };
+    }
+
     private static Label CreateLabel(string text, int x, int y) => new()
     {
         Text = text,
@@ -360,7 +379,6 @@ public class FrmTaiLenHinhAnh : Form
                 MessageBoxIcon.Warning);
         }
     }
-
     private void NapTepDuocChon(string path)
     {
         txtDuongDanTep.Text = path;
@@ -375,6 +393,7 @@ public class FrmTaiLenHinhAnh : Form
             picPreview.Image = null;
         }
     }
+
 
     private async Task ThucHienTaiLenAsync()
     {
@@ -467,12 +486,11 @@ public class FrmTaiLenHinhAnh : Form
 
             for (int i = 0; i < tongSoAnh; i++)
             {
-                int chiSo = i; // bản sao cục bộ để lambda progress không bị lệch khi i tăng
-                string path = _danhSachDuongDanAnh[chiSo];
+                string path = _danhSachDuongDanAnh[i];
                 string tenAnh = Path.GetFileName(path);
 
                 lblTrangThai.Text =
-                    $"Đang lưu ảnh {chiSo + 1}/{tongSoAnh}: {tenAnh}";
+                    $"Đang lưu ảnh {i + 1}/{tongSoAnh}: {tenAnh}";
 
                 try
                 {
@@ -503,18 +521,20 @@ public class FrmTaiLenHinhAnh : Form
                         MaTaiKhoanTaiLen = 0
                     };
 
+                    int phanTramAnhHienTai = 0;
+
                     var progress = new Progress<int>(pct =>
                     {
-                        int phanTramAnhHienTai = Math.Clamp(pct, 0, 100);
+                        phanTramAnhHienTai = Math.Clamp(pct, 0, 100);
 
                         int tongPhanTram =
-                            (chiSo * 100 + phanTramAnhHienTai) / tongSoAnh;
+                            (i * 100 + phanTramAnhHienTai) / tongSoAnh;
 
                         prgTienTrinh.Value =
                             Math.Clamp(tongPhanTram, 0, 100);
 
                         lblTrangThai.Text =
-                            $"Ảnh {chiSo + 1}/{tongSoAnh}: " +
+                            $"Ảnh {i + 1}/{tongSoAnh}: " +
                             $"{phanTramAnhHienTai}%";
                     });
 
@@ -535,7 +555,6 @@ public class FrmTaiLenHinhAnh : Form
 
             ResultImage = ketQua.LastOrDefault();
 
-            // Tất cả ảnh đã lưu: báo thành công và đóng form.
             if (soAnhThanhCong == tongSoAnh)
             {
                 lblTrangThai.Text =
@@ -552,7 +571,6 @@ public class FrmTaiLenHinhAnh : Form
                 return;
             }
 
-            // Có ảnh lỗi: giữ form mở để người dùng xử lý.
             lblTrangThai.Text =
                 $"Đã lưu {soAnhThanhCong}/{tongSoAnh} ảnh.";
 
@@ -572,6 +590,13 @@ public class FrmTaiLenHinhAnh : Form
                 soAnhThanhCong > 0
                     ? MessageBoxIcon.Warning
                     : MessageBoxIcon.Error);
+
+            // Chỉ đóng form khi tất cả ảnh đã được lưu.
+            if (soAnhThanhCong == tongSoAnh)
+            {
+                DialogResult = DialogResult.OK;
+                Close();
+            }
         }
         catch (Exception ex)
         {

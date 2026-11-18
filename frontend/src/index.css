@@ -1,3 +1,15 @@
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+@theme {
+    --color-navy: #0f2b4d;
+    --color-brand: #1f5fae;
+    --color-muted: #7a8699;
+    --color-line: #d9e0ea;
+    --color-soft: #f6f8fb;
+}
+
 :root {
     --navy: #0f2b4d;
     --blue: #1f5fae;

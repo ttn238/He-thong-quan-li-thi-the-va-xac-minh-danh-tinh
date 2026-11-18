@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using DeathManagement.API.Helpers;
 using DeathManagement.API.Data;
 using DeathManagement.API.DTOs.Image;
 using DeathManagement.API.Entities;
@@ -153,8 +154,36 @@ public class ImageService(ApplicationDbContext db) : IImageService
         AccessControl.Require(AuthorizationPolicies.ResourceFile, AuthorizationPolicies.ActionCreate);
         req.MaTaiKhoanTaiLen = AccessControl.UserId!.Value;   // luôn lấy từ token, bỏ qua giá trị UI gửi lên
 
+        if (!req.MaHoSoThiThe.HasValue && !req.MaHoSoMatTich.HasValue
+            && !req.MaTinBao.HasValue && !req.MaXacMinh.HasValue)
+            throw new InvalidOperationException("Ảnh phải gắn với ít nhất một tin báo, hồ sơ thi thể, hồ sơ mất tích hoặc xác minh.");
+
+        if (!ImageHelper.LoaiHopLe.Contains(req.LoaiHinhAnh))
+            throw new InvalidOperationException("Loại hình ảnh không hợp lệ.");
+
+        // Người dân (phạm vi OWN) chỉ được thêm ảnh vào tin báo do chính mình tạo
+        if (req.MaTinBao.HasValue && AccessControl.RoleCode == AuthorizationPolicies.RoleCitizen)
+        {
+            var laCuaToi = await db.Database
+                .SqlQuery<int>($"SELECT COUNT(*) AS [Value] FROM TinBao WHERE MaTinBao = {req.MaTinBao} AND MaTaiKhoanTiepNhan = {req.MaTaiKhoanTaiLen}")
+                .SingleAsync();
+            if (laCuaToi == 0)
+                throw new InvalidOperationException("Bạn không có quyền thêm ảnh vào tin báo này.");
+        }
+
+        if (req.MaTinBao.HasValue
+            && await db.Images.CountAsync(x => x.MaTinBao == req.MaTinBao && x.TrangThai == "HoatDong") >= ImageHelper.MaxAnhMoiTinBao)
+            throw new InvalidOperationException($"Tin báo đã đủ {ImageHelper.MaxAnhMoiTinBao} ảnh.");
+
+        if (req.MaHoSoMatTich.HasValue
+            && await db.Images.CountAsync(x => x.MaHoSoMatTich == req.MaHoSoMatTich && x.TrangThai == "HoatDong") >= ImageHelper.MaxAnhMoiHoSoMatTich)
+            throw new InvalidOperationException($"Hồ sơ mất tích đã đủ {ImageHelper.MaxAnhMoiHoSoMatTich} ảnh.");
+
         if (!File.Exists(req.FilePath))
-            throw new FileNotFoundException("Tệp nguồn không tồn tại.", req.FilePath);
+        {
+            throw new FileNotFoundException(
+                "Không tìm thấy tệp ảnh được chọn.");
+        }
 
         var fi = new FileInfo(req.FilePath);
         if (!FileHelper.IsValidImageExtension(fi.Name))
@@ -205,7 +234,7 @@ public class ImageService(ApplicationDbContext db) : IImageService
         var relativePath = $"/{subFolder}/{fileGuid}";
 
         // Async I/O copy file có báo cáo tiến trình (Chương 5 Đồ án)
-        await using (var sourceStream = new FileStream(req.FilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true))
+        await using (var sourceStream = new FileStream(duongDanNguon, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true))
         await using (var destStream = new FileStream(destFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
         {
             var buffer = new byte[81920];
@@ -277,15 +306,33 @@ public class ImageService(ApplicationDbContext db) : IImageService
         };
 
         db.Images.Add(entity);
+
         try
         {
             await db.SaveChangesAsync();
         }
-        catch
+        catch (DbUpdateException ex)
         {
-            try { File.Delete(destFilePath); } catch { }
-            throw;
+            // Lấy lỗi chi tiết từ SQL Server / Entity Framework
+            string loiChiTiet = ex.ToString();
+
+            try
+            {
+                if (File.Exists(destFilePath))
+                    File.Delete(destFilePath);
+            }
+            catch
+            {
+                // Không che mất lỗi gốc.
+            }
+
+            System.Diagnostics.Debug.WriteLine(loiChiTiet);
+
+            throw new InvalidOperationException(
+                "Lỗi lưu thông tin ảnh vào database:\n" + loiChiTiet,
+                ex);
         }
+
 
         // Ghi Audit Log qua thủ tục sp_GhiNhatKy
         try
