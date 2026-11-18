@@ -259,25 +259,6 @@ public class FrmTaiLenHinhAnh : Form
         AutoSize = true
     };
 
-    // Bật kéo-thả file ảnh cho một control
-    private void BatKeoTha(Control c)
-    {
-        c.AllowDrop = true;
-        c.DragEnter += (_, e) => e.Effect = e.Data?.GetDataPresent(DataFormats.FileDrop) == true
-            ? DragDropEffects.Copy : DragDropEffects.None;
-        c.DragDrop += (_, e) =>
-        {
-            if (e.Data?.GetData(DataFormats.FileDrop) is not string[] files || files.Length == 0) return;
-            if (files.Length > MaxSoAnh)
-            {
-                MessageBox.Show($"Chỉ được kéo-thả tối đa {MaxSoAnh} ảnh mỗi lần.", "Vượt quá số lượng cho phép",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-            XuLyDanhSachAnhKeoTha(files);
-        };
-    }
-
     private void ChonTepDialog()
     {
         using var ofd = new OpenFileDialog

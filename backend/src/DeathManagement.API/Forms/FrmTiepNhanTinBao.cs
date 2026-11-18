@@ -1,6 +1,11 @@
-namespace DeathManagement.API.Forms;
-
+using DeathManagement.API.DTOs.Image;
+using DeathManagement.API.DTOs.TinBao;
+using DeathManagement.API.Helpers;
 using DeathManagement.API.Security;
+using DeathManagement.API.Services;
+using Microsoft.EntityFrameworkCore;
+
+namespace DeathManagement.API.Forms;
 
 public class FrmTiepNhanTinBao : Form
 {

@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using DeathManagement.API.Helpers;
 using DeathManagement.API.Data;
 using DeathManagement.API.DTOs.Image;
 using DeathManagement.API.Entities;
@@ -192,32 +191,6 @@ public class ImageService(ApplicationDbContext db) : IImageService
             throw new InvalidOperationException("Ảnh phải lớn hơn 0 và không quá 10 MB.");
         if (!FileHelper.IsValidImageContent(req.FilePath))
             throw new InvalidOperationException("Tệp không phải ảnh hợp lệ hoặc đã bị hỏng.");
-        if (!ImageHelper.LoaiHopLe.Contains(req.LoaiHinhAnh))
-            throw new InvalidOperationException("Loại hình ảnh không hợp lệ.");
-        if (req.MaHoSoThiThe == null && req.MaHoSoMatTich == null && req.MaTinBao == null && req.MaXacMinh == null)
-            throw new InvalidOperationException("Ảnh phải gắn với ít nhất một hồ sơ.");
-
-        if (req.MaTinBao.HasValue)
-        {
-            // Người dân chỉ được thêm ảnh vào tin báo do chính mình tạo
-            if (AccessControl.RoleCode == AuthorizationPolicies.RoleCitizen)
-            {
-                int cuaToi = await db.Database.SqlQuery<int>(
-                    $"SELECT COUNT(*) AS [Value] FROM TinBao WHERE MaTinBao = {req.MaTinBao.Value} AND MaTaiKhoanTiepNhan = {req.MaTaiKhoanTaiLen}").SingleAsync();
-                if (cuaToi == 0)
-                    throw AccessControl.NoPermission(AccessControl.Principal, AuthorizationPolicies.ResourceFile,
-                        AuthorizationPolicies.ActionCreate, "Chỉ được thêm ảnh vào tin báo do chính mình tạo.");
-            }
-            int daCo = await db.Images.CountAsync(x => x.MaTinBao == req.MaTinBao && x.TrangThai == "HoatDong");
-            if (daCo >= ImageHelper.MaxAnhMoiTinBao)
-                throw new InvalidOperationException($"Mỗi tin báo tối đa {ImageHelper.MaxAnhMoiTinBao} ảnh.");
-        }
-        if (req.MaHoSoMatTich.HasValue)
-        {
-            int daCo = await db.Images.CountAsync(x => x.MaHoSoMatTich == req.MaHoSoMatTich && x.TrangThai == "HoatDong");
-            if (daCo >= ImageHelper.MaxAnhMoiHoSoMatTich)
-                throw new InvalidOperationException($"Mỗi hồ sơ mất tích tối đa {ImageHelper.MaxAnhMoiHoSoMatTich} ảnh.");
-        }
 
         var ext = fi.Extension.ToLowerInvariant();
         var mime = ImageHelper.GetMimeType(fi.Name);
@@ -234,7 +207,7 @@ public class ImageService(ApplicationDbContext db) : IImageService
         var relativePath = $"/{subFolder}/{fileGuid}";
 
         // Async I/O copy file có báo cáo tiến trình (Chương 5 Đồ án)
-        await using (var sourceStream = new FileStream(duongDanNguon, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true))
+        await using (var sourceStream = new FileStream(req.FilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true))
         await using (var destStream = new FileStream(destFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
         {
             var buffer = new byte[81920];
