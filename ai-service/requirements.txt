@@ -7,9 +7,13 @@ pydantic-settings>=2.3,<3.0
 numpy>=1.26
 opencv-python-headless>=4.9
 pillow>=10.3
+
 # OCR (ONNX Runtime, mo hinh di kem san trong goi)
 rapidocr>=3.0
 onnxruntime>=1.18
+vietocr>=0.3.13
+setuptools<70
+
 # Nhan dien doi tuong YOLOv8 (keo theo torch, ban CPU la du)
 ultralytics>=8.3
 # Kiem thu

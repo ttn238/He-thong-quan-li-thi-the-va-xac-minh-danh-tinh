@@ -1,35 +1,21 @@
-import { User } from '../../types/User';
+import type { User } from '../../types/User';
+import { session } from '../../services/session';
 
 export const authHelper = {
   getToken(): string | null {
-    return localStorage.getItem('access_token');
+    return session.get()?.token ?? null;
   },
 
   getCurrentUser(): User | null {
-    const raw = localStorage.getItem('current_user');
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  },
-
-  setCurrentUser(user: User): void {
-    localStorage.setItem('current_user', JSON.stringify(user));
-  },
-
-  setToken(token: string): void {
-    localStorage.setItem('access_token', token);
+    return session.get()?.user ?? null;
   },
 
   clearAuth(): void {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('current_user');
+    session.clear();
   },
 
   isAuthenticated(): boolean {
-    return !!this.getToken();
+    return !!session.get();
   },
 
   isAdmin(): boolean {
