@@ -90,12 +90,21 @@ public class FrmKetQuaAI : Form
         {
             if (!AccessControl.Can(ResourceAiResult, ActionView)) { BeginInvoke(new Action(Close)); return; }
             Chay(KiemTraKetNoiAsync);
-            if (_idCanMo != null) Chay(() => MoTheoMaAsync(_idCanMo)); else HienMau(AiMau.CoKetQua);
+            if (_idCanMo != null) Chay(() => MoTheoMaAsync(_idCanMo));
+            else if (!string.IsNullOrWhiteSpace(_filePath) && File.Exists(_filePath)) Chay(() => PhanTichAsync(_filePath));
+            else HienMau(AiMau.CoKetQua);
         };
     }
 
     /// <summary>Mở thẳng một kết quả đã có trên ai-service theo mã yêu cầu (AI-REQ-...).</summary>
     public FrmKetQuaAI(string requestId) : this() { _idCanMo = requestId; }
+
+    /// <summary>Mở và phân tích một tệp ảnh vật lý từ ổ đĩa.</summary>
+    public FrmKetQuaAI(string? filePath, string? linkedRecordId = null) : this()
+    {
+        _filePath = filePath;
+        _idCanMo = null;
+    }
 
     // =====================================================================
     //  XÂY GIAO DIỆN KHUNG

@@ -110,18 +110,53 @@ async def analyze(
         logger.exception("Image analysis failed for request %s", request_id)
         raise ModelUnavailableError("Không thể phân tích ảnh lúc này.") from exc
 
+    locations: list[dict] = []
+    if settings.geocoder_enabled and text_items:
+        try:
+            from app.api.deps import get_geocoder
+            from app.services.address_normalizer import address_text_from_ocr_lines
+            from app.services.location_service import search_location
+
+            raw_lines = [item.text for item in text_items]
+            addr_text = address_text_from_ocr_lines(raw_lines, min_confidence=0.5)
+            if addr_text.strip():
+                loc_res = search_location(
+                    addr_text.strip(),
+                    get_geocoder(),
+                    limit=3,
+                    max_attempts=settings.geocoder_max_attempts,
+                    budget_s=settings.geocoder_budget_s,
+                )
+                for i, c in enumerate(loc_res.candidates):
+                    admin_area = None
+                    if c.address:
+                        admin_area = c.address.city or c.address.province or c.address.district
+                    locations.append({
+                        "rank": i + 1,
+                        "name": c.display_name,
+                        "confidence": c.similarity,
+                        "adminArea": admin_area,
+                        "lat": c.lat,
+                        "lng": c.lng,
+                        "basis": f"Khớp mức {c.match_level}",
+                    })
+        except Exception:
+            logger.debug("Automatic location inference skipped or failed")
+
     result = AiResultOut(
         request_id=request_id, status="completed", linked_record_id=(linked_record_id or "").strip()[:120] or None,
         submitted_at=_now(), completed_at=_now(), engine="YOLOv8n (COCO) + RapidOCR",
         image_hash=hashlib.sha256(data).hexdigest(), image=image_info,
         ocr=text_items, objects=objects,
+        locations=locations,
         missing_fields=[
             MissingField(field="Văn bản/OCR", status="done" if text_items else "missing",
                          recommendation=None if text_items else "Không phát hiện văn bản rõ; kiểm tra ảnh thủ công."),
             MissingField(field="Đối tượng trong ảnh", status="done" if objects else "missing",
                          recommendation=None if objects else "YOLO không phát hiện đối tượng thuộc các lớp hỗ trợ."),
-            MissingField(field="Địa điểm suy luận", status="unsupported",
-                         recommendation="Chưa có dữ liệu bản đồ để suy luận địa điểm."),
+            MissingField(field="Địa điểm suy luận",
+                         status="done" if locations else ("unsupported" if not settings.geocoder_enabled else "missing"),
+                         recommendation=None if locations else "Không phát hiện chuỗi địa danh hành chính rõ ràng từ OCR."),
         ],
     )
     _save(request, result)

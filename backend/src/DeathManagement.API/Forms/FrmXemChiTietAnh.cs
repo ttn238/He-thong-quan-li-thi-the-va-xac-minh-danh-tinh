@@ -92,7 +92,24 @@ public class FrmXemChiTietAnh : Form
         var btnReset = CreateToolButton("↺ Vừa khung", () => ResetZoom());
         btnReset.Location = new Point(465, 6);
 
-        pnlToolbar.Controls.AddRange(new Control[] { btnZoomIn, btnZoomOut, btnRotateRight, btnFlipX, btnReset });
+        var btnAiAnalysis = CreateToolButton("🤖 Phân tích AI", () =>
+        {
+            var service = new ImageService(Program.NewDb());
+            var physicalPath = service.LayDuongDanVatLy(_imageDto.DuongDan);
+            if (!File.Exists(physicalPath))
+            {
+                MessageBox.Show("Không tìm thấy tệp ảnh vật lý để gửi AI phân tích.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            using var fAi = new FrmKetQuaAI(physicalPath, $"IMG#{_imageDto.MaHinhAnh}");
+            fAi.ShowDialog(this);
+        });
+        btnAiAnalysis.BackColor = UITheme.Navy;
+        btnAiAnalysis.ForeColor = Color.White;
+        btnAiAnalysis.Location = new Point(575, 6);
+        btnAiAnalysis.Size = new Size(130, 30);
+
+        pnlToolbar.Controls.AddRange(new Control[] { btnZoomIn, btnZoomOut, btnRotateRight, btnFlipX, btnReset, btnAiAnalysis });
 
         // 3. Metadata Panel bên phải
         var pnlInfo = new Panel

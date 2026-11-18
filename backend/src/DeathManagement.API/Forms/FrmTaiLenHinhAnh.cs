@@ -264,7 +264,7 @@ public class FrmTaiLenHinhAnh : Form
         using var ofd = new OpenFileDialog
         {
             Title = "Chọn ảnh cần tải lên",
-            Filter = "Ảnh được hỗ trợ (*.jpg;*.jpeg;*.png;*.bmp)|*.jpg;*.jpeg;*.png;*.bmp",
+            Filter = "Ảnh được hỗ trợ (*.jpg;*.jpeg;*.png;*.bmp;*.webp)|*.jpg;*.jpeg;*.png;*.bmp;*.webp",
             Multiselect = true,
             CheckFileExists = true
         };
