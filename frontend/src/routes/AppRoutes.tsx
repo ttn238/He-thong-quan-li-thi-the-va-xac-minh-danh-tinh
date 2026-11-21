@@ -5,6 +5,7 @@ import UserDashboard from '../pages/dashboard/UserDashboard';
 import AiResultPage from '../pages/identification/AiResultPage';
 import UserManagement from '../pages/users/UserManagement';
 import RoleManagement from '../pages/roles/RoleManagement';
+import StorageManagement from '../pages/storage/StorageManagement';
 import { authService } from '../services/authService';
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -21,6 +22,8 @@ export default function AppRoutes() {
         <Route path="/admin/users" element={<RequireAuth><UserManagement /></RequireAuth>} />
         <Route path="/roles" element={<RequireAuth><RoleManagement /></RequireAuth>} />
         <Route path="/admin/roles" element={<RequireAuth><RoleManagement /></RequireAuth>} />
+        <Route path="/storage" element={<RequireAuth><StorageManagement /></RequireAuth>} />
+        <Route path="/storage/locations" element={<RequireAuth><StorageManagement /></RequireAuth>} />
         <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>;
 }

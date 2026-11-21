@@ -11,6 +11,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<Image> Images => Set<Image>();
+    public DbSet<StorageLocation> StorageLocations => Set<StorageLocation>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
