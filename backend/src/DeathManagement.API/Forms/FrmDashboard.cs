@@ -201,6 +201,15 @@ public class FrmDashboard : Form
         { Visible = AccessControl.Can(ResourceFile, ActionView) };
         mnuNghiepVu.DropDownItems.Add(mnuKhoAnh);
 
+        var mnuViTriLuuTru = new ToolStripMenuItem("Vị trí lưu trữ & Ngăn lạnh...", null, (s, e) =>
+        {
+            if (!PermissionUi.Check(this, ResourceStorage, ActionView)) return;
+            using var f = new FrmQuanLyViTriLuuTru();
+            f.ShowDialog(this);
+        })
+        { Visible = AccessControl.Can(ResourceStorage, ActionView) };
+        mnuNghiepVu.DropDownItems.Add(mnuViTriLuuTru);
+
         var mnuTroGiup = new ToolStripMenuItem("ℹ TRỢ GIÚP");
         mnuTroGiup.DropDownItems.Add(new ToolStripMenuItem("Thông tin phần mềm DVI Vietnam"));
 
@@ -284,6 +293,16 @@ public class FrmDashboard : Form
             {
                 if (!PermissionUi.Check(this, ResourceAiResult, ActionView)) return;
                 using var f = new FrmKetQuaAI();
+                f.ShowDialog(this);
+            }));
+        }
+
+        if (AccessControl.Can(ResourceStorage, ActionView))
+        {
+            pnlButtons.Controls.Add(CreateQuickActionButton("Quản lý vị trí lưu trữ & kho lạnh", ColorTranslator.FromHtml("#16a085"), () =>
+            {
+                if (!PermissionUi.Check(this, ResourceStorage, ActionView)) return;
+                using var f = new FrmQuanLyViTriLuuTru();
                 f.ShowDialog(this);
             }));
         }

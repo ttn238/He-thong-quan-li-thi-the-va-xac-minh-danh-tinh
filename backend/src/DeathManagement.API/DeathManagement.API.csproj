@@ -22,6 +22,7 @@
 		<Compile Remove="Middleware\**" />
 		<!-- Chép appsettings.json ra thư mục chạy để đọc chuỗi kết nối -->
 		<None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+		<None Update="appsettings.local.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('appsettings.local.json')" />
 	</ItemGroup>
 
 	<ProjectExtensions><VisualStudio><UserProperties appsettings_1json__JsonSchema="" /></VisualStudio></ProjectExtensions>

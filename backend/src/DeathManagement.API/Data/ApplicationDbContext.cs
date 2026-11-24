@@ -13,6 +13,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<Image> Images => Set<Image>();
     public DbSet<Body> Bodies => Set<Body>();
+    public DbSet<StorageLocation> StorageLocations => Set<StorageLocation>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
