@@ -30,6 +30,10 @@ public class BodyDto
 
     /// <summary>Mã tin báo liên kết (nếu có).</summary>
     public int? MaTinBao { get; set; }
+    public int? MaViTri { get; set; }
+    public string? Khu { get; set; }
+    public string? Tu { get; set; }
+    public string? Ngan { get; set; }
 
     /// <summary>Nhãn trạng thái dùng để hiển thị trên UI.</summary>
     public string NhanTrangThai => TrangThai switch

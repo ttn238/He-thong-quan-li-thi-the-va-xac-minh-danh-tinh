@@ -49,16 +49,44 @@ public class BodyRepository(ApplicationDbContext db) : IBodyRepository
     /// <inheritdoc />
     public async Task<(List<BodyDto> Items, int Total)> LayDanhSachAsync(
         string? tuKhoa, string? trangThai, int trang, int soLuong)
+        => await LayDanhSachAsync(new BodyFilterRequest
+        { TuKhoa = tuKhoa, TrangThai = trangThai, Trang = trang, SoLuong = soLuong }, false);
+
+    public async Task<(List<BodyDto> Items, int Total)> LayDanhSachAsync(BodyFilterRequest filter, bool nhaXac)
     {
-        var query = db.Set<Body>().AsNoTracking();
+        // Query the restricted view before filtering so hidden fields cannot leak through search counts.
+        IQueryable<BodyDto> query = nhaXac
+            ? db.Database.SqlQuery<BodyDto>($"""
+                SELECT MaHoSoThiThe, TrangThai, ThoiGianPhatHien, GioiTinh, TuoiUocLuong,
+                       MaViTri, Khu, Tu, Ngan,
+                       CAST(NULL AS nvarchar(255)) AS DiaDiem,
+                       CAST(NULL AS decimal(5,2)) AS ChieuCao,
+                       CAST(NULL AS nvarchar(max)) AS DacDiemCoThe,
+                       CAST(NULL AS int) AS MaTinBao
+                FROM dbo.v_HoSoThiTheNhaXac
+                """)
+            : db.Set<Body>().AsNoTracking().Select(x => new BodyDto
+            {
+                MaHoSoThiThe = x.MaHoSoThiThe, ThoiGianPhatHien = x.ThoiGianPhatHien,
+                DiaDiem = x.DiaDiem, TrangThai = x.TrangThai, GioiTinh = x.GioiTinh,
+                TuoiUocLuong = x.TuoiUocLuong, ChieuCao = x.ChieuCao,
+                DacDiemCoThe = x.DacDiemCoThe, MaTinBao = x.MaTinBao
+            });
 
-        if (!string.IsNullOrWhiteSpace(trangThai))
-            query = query.Where(x => x.TrangThai == trangThai);
+        if (!string.IsNullOrWhiteSpace(filter.TrangThai))
+            query = query.Where(x => x.TrangThai == filter.TrangThai);
+        if (!string.IsNullOrWhiteSpace(filter.GioiTinh))
+            query = query.Where(x => x.GioiTinh == filter.GioiTinh);
+        if (filter.TuNgay.HasValue)
+            query = query.Where(x => x.ThoiGianPhatHien >= filter.TuNgay.Value);
+        if (filter.DenNgay.HasValue)
+            query = query.Where(x => x.ThoiGianPhatHien <= filter.DenNgay.Value);
 
-        if (!string.IsNullOrWhiteSpace(tuKhoa))
+        if (!string.IsNullOrWhiteSpace(filter.TuKhoa))
         {
-            var kw = tuKhoa.Trim();
+            var kw = filter.TuKhoa.Trim();
             query = query.Where(x =>
+                x.MaHoSoThiThe.ToString().Contains(kw) ||
                 (x.DiaDiem != null && x.DiaDiem.Contains(kw)) ||
                 (x.DacDiemCoThe != null && x.DacDiemCoThe.Contains(kw)));
         }
@@ -67,20 +95,8 @@ public class BodyRepository(ApplicationDbContext db) : IBodyRepository
 
         var items = await query
             .OrderByDescending(x => x.MaHoSoThiThe)
-            .Skip((trang - 1) * soLuong)
-            .Take(soLuong)
-            .Select(x => new BodyDto
-            {
-                MaHoSoThiThe    = x.MaHoSoThiThe,
-                ThoiGianPhatHien = x.ThoiGianPhatHien,
-                DiaDiem         = x.DiaDiem,
-                TrangThai       = x.TrangThai,
-                GioiTinh        = x.GioiTinh,
-                TuoiUocLuong    = x.TuoiUocLuong,
-                ChieuCao        = x.ChieuCao,
-                DacDiemCoThe    = x.DacDiemCoThe,
-                MaTinBao        = x.MaTinBao
-            })
+            .Skip(checked((filter.Trang - 1) * filter.SoLuong))
+            .Take(filter.SoLuong)
             .ToListAsync();
 
         return (items, total);

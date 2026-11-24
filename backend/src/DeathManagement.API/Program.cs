@@ -28,7 +28,7 @@ static class Program
     public static int AiTimeoutSeconds => int.TryParse(Config["AiService:TimeoutSeconds"], out var s) && s > 0 ? s : 30;
 
     [STAThread]
-    static void Main()
+    static void Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
 
@@ -40,6 +40,12 @@ static class Program
             Audience = Config["Jwt:Audience"] ?? "DeathManagement.Client",
             ExpireMinutes = int.TryParse(Config["Jwt:ExpireMinutes"], out var m) && m > 0 ? m : 480
         });
+
+        if (args.Contains("--body-api"))
+        {
+            BodyApiHost.Run(args.Where(x => x != "--body-api").ToArray());
+            return;
+        }
 
         // 2. Ghi Audit Log mọi lần bị từ chối quyền
         AccessControl.Denied += (userId, resource, action, reason) =>

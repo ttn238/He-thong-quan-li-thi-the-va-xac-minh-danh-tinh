@@ -16,6 +16,7 @@ public interface IBodyService
 
     /// <summary>Lấy danh sách hồ sơ có phân trang. Yêu cầu quyền BODY:VIEW.</summary>
     Task<(List<BodyDto> Items, int Total)> LayDanhSachAsync(string? tuKhoa, string? trangThai, int trang = 1, int soLuong = 20);
+    Task<(List<BodyDto> Items, int Total)> LayDanhSachAsync(BodyFilterRequest filter);
 
     /// <summary>Cập nhật thông tin hồ sơ. Yêu cầu quyền BODY:UPDATE.</summary>
     Task CapNhatAsync(long maHoSoThiThe, UpdateBodyRequest request);

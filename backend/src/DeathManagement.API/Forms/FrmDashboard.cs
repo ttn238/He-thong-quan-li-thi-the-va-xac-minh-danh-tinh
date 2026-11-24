@@ -185,6 +185,12 @@ public class FrmDashboard : Form
         })
         { Visible = AccessControl.Can(ResourceAiResult, ActionView) };
         mnuNghiepVu.DropDownItems.Add(mnuKetQuaAi);
+        mnuNghiepVu.DropDownItems.Add(new ToolStripMenuItem("Danh sách hồ sơ thi thể", null, (_, _) =>
+        {
+            if (!PermissionUi.Check(this, ResourceBody, ActionView)) return;
+            using var form = new FrmQuanLyThiThe();
+            form.ShowDialog(this);
+        }) { Visible = AccessControl.Can(ResourceBody, ActionView) });
         mnuNghiepVu.DropDownItems.Add(new ToolStripSeparator());
         var mnuKhoAnh = new ToolStripMenuItem("🖼️ Kho hình ảnh & Tệp đính kèm...", null, (s, e) =>
         {

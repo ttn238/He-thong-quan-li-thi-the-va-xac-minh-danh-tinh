@@ -63,6 +63,9 @@ public class BodyService(IBodyRepository repo) : IBodyService
         AccessControl.Require(ResBody, ActView);
 
         var body = await repo.LayTheoMaAsync(maHoSoThiThe);
+        if (body != null && (AccessControl.RoleCode == "NHA_XAC" || AccessControl.ScopeOf(ResBody, ActView) == "PARTIAL"))
+            return new BodyDto { MaHoSoThiThe = body.MaHoSoThiThe, TrangThai = body.TrangThai,
+                ThoiGianPhatHien = body.ThoiGianPhatHien, GioiTinh = body.GioiTinh, TuoiUocLuong = body.TuoiUocLuong };
         return body == null ? null : MapToDto(body);
     }
 
@@ -71,13 +74,26 @@ public class BodyService(IBodyRepository repo) : IBodyService
     /// <inheritdoc />
     public async Task<(List<BodyDto> Items, int Total)> LayDanhSachAsync(
         string? tuKhoa, string? trangThai, int trang = 1, int soLuong = 20)
+        => await LayDanhSachAsync(new BodyFilterRequest
+        { TuKhoa = tuKhoa, TrangThai = trangThai, Trang = trang, SoLuong = soLuong });
+
+    public async Task<(List<BodyDto> Items, int Total)> LayDanhSachAsync(BodyFilterRequest filter)
     {
         AccessControl.Require(ResBody, ActView);
-
-        trang    = Math.Max(1, trang);
-        soLuong  = Math.Clamp(soLuong, 1, 100);
-
-        return await repo.LayDanhSachAsync(tuKhoa, trangThai, trang, soLuong);
+        if (AccessControl.ScopeOf(ResBody, ActView) is not ("ALL" or "PARTIAL"))
+            throw new ForbiddenException("Phạm vi quyền chưa hỗ trợ xem danh sách hồ sơ.");
+        if (filter.Trang < 1 || filter.SoLuong is < 1 or > 100 ||
+            (long)(filter.Trang - 1) * filter.SoLuong > int.MaxValue)
+            throw new ArgumentException("Trang phải từ 1 và số lượng từ 1 đến 100.");
+        ValidateGioiTinh(filter.GioiTinh);
+        if (filter.TrangThai != null && !new[] { "MoiTiepNhan", "DangLuuGiu", "DangXacMinh", "DaXacDinh", "DaBanGiao", "DongHoSo", "TiepTucLuuGiu" }.Contains(filter.TrangThai))
+            throw new ArgumentException("Trạng thái hồ sơ không hợp lệ.");
+        if (filter.TuNgay > filter.DenNgay)
+            throw new ArgumentException("Thời gian bắt đầu phải trước thời gian kết thúc.");
+        if (filter.TuKhoa?.Length > 255)
+            throw new ArgumentException("Từ khóa tối đa 255 ký tự.");
+        return await repo.LayDanhSachAsync(filter,
+            AccessControl.RoleCode == "NHA_XAC" || AccessControl.ScopeOf(ResBody, ActView) == "PARTIAL");
     }
 
     // ────────────────────────── Cập nhật ─────────────────────────────

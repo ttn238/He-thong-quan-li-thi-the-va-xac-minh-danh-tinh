@@ -16,6 +16,7 @@ public interface IBodyRepository
 
     /// <summary>Lấy danh sách có phân trang, lọc theo từ khóa và trạng thái.</summary>
     Task<(List<BodyDto> Items, int Total)> LayDanhSachAsync(string? tuKhoa, string? trangThai, int trang, int soLuong);
+    Task<(List<BodyDto> Items, int Total)> LayDanhSachAsync(BodyFilterRequest filter, bool nhaXac);
 
     /// <summary>Cập nhật thông tin hồ sơ thi thể.</summary>
     Task CapNhatAsync(long maHoSoThiThe, UpdateBodyRequest request, long maTaiKhoan);
