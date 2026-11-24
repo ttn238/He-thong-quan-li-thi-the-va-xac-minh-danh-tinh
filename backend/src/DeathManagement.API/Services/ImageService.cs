@@ -12,8 +12,28 @@ namespace DeathManagement.API.Services;
 
 public class ImageService(ApplicationDbContext db) : IImageService
 {
-    private static readonly string StorageBaseDir = Program.Config["Storage:RootPath"] is { Length: > 0 } root
-    ? root : Path.Combine(AppContext.BaseDirectory, "App_Data", "storage");
+    private static readonly string StorageBaseDir = GetSafeStorageBaseDir();
+
+    private static string GetSafeStorageBaseDir()
+    {
+        var configured = Program.Config["Storage:RootPath"];
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            try
+            {
+                var root = Path.GetPathRoot(configured);
+                if (string.IsNullOrEmpty(root) || Directory.Exists(root))
+                {
+                    Directory.CreateDirectory(configured);
+                    return configured;
+                }
+            }
+            catch { }
+        }
+        var fallback = Path.Combine(AppContext.BaseDirectory, "App_Data", "storage");
+        try { Directory.CreateDirectory(fallback); } catch { }
+        return fallback;
+    }
 
     public string LayDuongDanVatLy(string duongDanLuuTru)
     {

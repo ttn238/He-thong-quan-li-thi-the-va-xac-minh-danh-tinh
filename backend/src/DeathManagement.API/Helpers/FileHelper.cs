@@ -15,7 +15,7 @@ public static class FileHelper
 
     public static readonly string[] AllowedImageExtensions =
     {
-        ".jpg", ".jpeg", ".png", ".bmp"
+        ".jpg", ".jpeg", ".png", ".bmp", ".webp"
     };
 
     /// <summary>
@@ -52,6 +52,18 @@ public static class FileHelper
 
         try
         {
+            var ext = Path.GetExtension(filePath).ToLowerInvariant();
+            if (ext == ".webp")
+            {
+                using var fs = File.OpenRead(filePath);
+                if (fs.Length < 12) return false;
+                var header = new byte[12];
+                int read = fs.Read(header, 0, 12);
+                if (read < 12) return false;
+                return header[0] == (byte)'R' && header[1] == (byte)'I' && header[2] == (byte)'F' && header[3] == (byte)'F'
+                    && header[8] == (byte)'W' && header[9] == (byte)'E' && header[10] == (byte)'B' && header[11] == (byte)'P';
+            }
+
             using var image = Image.FromFile(filePath, useEmbeddedColorManagement: false);
 
             Guid format = image.RawFormat.Guid;

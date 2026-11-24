@@ -47,9 +47,12 @@ public class FrmTiepNhanTinBao : Form
     private readonly Button btnChonAnh = TaoNut("Chọn / Tải ảnh lên", 130, UITheme.Navy, Color.White);
     private readonly Button btnWebcam = TaoNut("Chụp từ Webcam", 120, Color.White, UITheme.Navy);
     private readonly Button btnXoaAnh = TaoNut("Xóa ảnh", 80, Color.White, UITheme.Red);
-    private readonly Label lblAiTrangThai = new() { Dock = DockStyle.Top, Height = 38, Text = "Chưa phân tích: dịch vụ AI/OCR chưa được tích hợp vào ứng dụng.", ForeColor = UITheme.Muted, Font = UITheme.FontRegular(8.5f) };
+    private readonly Label lblAiTrangThai = new() { Dock = DockStyle.Top, Height = 38, Text = "Sẵn sàng: Chọn ảnh hiện trường và bấm [Phân tích AI] để bóc tách thông tin.", ForeColor = UITheme.Muted, Font = UITheme.FontRegular(8.5f) };
     private readonly TextBox txtOcr = new() { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, BackColor = UITheme.Soft, Font = UITheme.FontRegular(9) };
-    private readonly Button btnApDung = TaoNut("Áp dụng vào biểu mẫu", 150, Color.White, UITheme.Blue);
+    private readonly Button btnPhanTichAi = TaoNut("⚡ Phân tích AI", 110, UITheme.Blue, Color.White);
+    private readonly Button btnMoKetQuaAi = TaoNut("👁️ Chi tiết AI", 110, Color.White, UITheme.Navy);
+    private readonly Button btnApDung = TaoNut("Áp dụng vào biểu mẫu", 140, Color.White, UITheme.Navy);
+    private DeathManagement.API.DTOs.Ai.AiResultDto? _ketQuaAiHienTai;
 
     // ---- Nhóm sự việc ----
     private readonly DateTimePicker dtpThoiDiem = new() { Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy HH:mm:ss", Font = UITheme.FontRegular(9.5f) };
@@ -147,11 +150,11 @@ public class FrmTiepNhanTinBao : Form
         gbAnh.Controls.Add(flowAnh);         // Bottom, sát đáy
 
         var gbAi = TaoGroup("Kết Quả Phân Tích AI Tức Thời");
+        var flowAi = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 38, WrapContents = false };
+        flowAi.Controls.AddRange(new Control[] { btnPhanTichAi, btnMoKetQuaAi, btnApDung });
         gbAi.Controls.Add(txtOcr);
-        gbAi.Controls.Add(btnApDung);
-        btnApDung.Dock = DockStyle.Bottom;
-        btnApDung.Height = 32;
-        gbAi.Controls.Add(new Label { Dock = DockStyle.Top, Height = 20, Text = "Ký tự OCR nhận dạng được:", Font = UITheme.FontBold(8.5f) });
+        gbAi.Controls.Add(flowAi);
+        gbAi.Controls.Add(new Label { Dock = DockStyle.Top, Height = 20, Text = "Ký tự OCR & Đối tượng nhận dạng được:", Font = UITheme.FontBold(8.5f) });
         gbAi.Controls.Add(lblAiTrangThai);
 
         pnl.Controls.Add(gbAi);                                                        // Fill
@@ -237,13 +240,14 @@ public class FrmTiepNhanTinBao : Form
         dtpThoiDiem.Value = DateTime.Now;
         CapNhatBoDem();
         btnXoaAnh.Enabled = false;
+        btnApDung.Enabled = false;
+        btnPhanTichAi.Enabled = false;
+        btnMoKetQuaAi.Enabled = false;
 
-        // Chưa có chức năng thật -> vô hiệu hóa, không để nút "trang trí"
-        foreach (var b in new[] { btnWebcam, btnBanDo, btnIn, btnApDung }) b.Enabled = false;
+        foreach (var b in new[] { btnWebcam, btnBanDo, btnIn }) b.Enabled = false;
         _tip.SetToolTip(btnWebcam, "Chưa hỗ trợ chụp webcam");
         _tip.SetToolTip(btnBanDo, "Chưa tích hợp bản đồ GIS");
         _tip.SetToolTip(btnIn, "Chưa hỗ trợ in phiếu");
-        _tip.SetToolTip(btnApDung, "Cần dịch vụ AI/OCR (chưa tích hợp)");
     }
 
     private void GanSuKien()
@@ -259,6 +263,9 @@ public class FrmTiepNhanTinBao : Form
         btnXoaAnh.Click += (s, e) => XoaAnh();
         btnHuy.Click += (s, e) => HuyBo();
         btnGui.Click += async (s, e) => await GuiTinBaoAsync();
+        btnPhanTichAi.Click += async (s, e) => await ChayPhanTichAiAsync();
+        btnMoKetQuaAi.Click += (s, e) => MoKetQuaAiChiTiet();
+        btnApDung.Click += (s, e) => ApDungKetQuaAi();
         lvAnh.SelectedIndexChanged += (s, e) => XemTruocAnhDangChon();
         foreach (Control c in new Control[] { picHienTruong, lvAnh }) BatKeoTha(c);
     }
@@ -270,7 +277,7 @@ public class FrmTiepNhanTinBao : Form
         using var dlg = new OpenFileDialog
         {
             Title = "Chọn ảnh hiện trường",
-            Filter = "Ảnh (*.jpg;*.jpeg;*.png;*.bmp)|*.jpg;*.jpeg;*.png;*.bmp",
+            Filter = "Ảnh (*.jpg;*.jpeg;*.png;*.bmp;*.webp)|*.jpg;*.jpeg;*.png;*.bmp;*.webp",
             Multiselect = true,
             CheckFileExists = true
         };
@@ -344,14 +351,156 @@ public class FrmTiepNhanTinBao : Form
 
     private void XemTruocAnhDangChon()
     {
-        btnXoaAnh.Enabled = lvAnh.SelectedItems.Count > 0;
-        if (lvAnh.SelectedItems.Count == 0) return;
+        bool coChon = lvAnh.SelectedItems.Count > 0;
+        btnXoaAnh.Enabled = coChon;
+        btnPhanTichAi.Enabled = coChon;
+        btnMoKetQuaAi.Enabled = coChon;
+        if (!coChon) return;
         var a = (AnhChon)lvAnh.SelectedItems[0].Tag!;
         using var fs = File.OpenRead(a.DuongDan);
         using var goc = System.Drawing.Image.FromStream(fs);
         var bmp = new Bitmap(goc);
         picHienTruong.Image?.Dispose();
         picHienTruong.Image = bmp;
+    }
+
+    private async Task ChayPhanTichAiAsync()
+    {
+        if (lvAnh.SelectedItems.Count == 0)
+        {
+            MessageBox.Show("Vui lòng chọn một ảnh hiện trường từ danh sách để phân tích.", "Chưa chọn ảnh", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var a = (AnhChon)lvAnh.SelectedItems[0].Tag!;
+        btnPhanTichAi.Enabled = false;
+        lblAiTrangThai.ForeColor = UITheme.Navy;
+        lblAiTrangThai.Text = "⏳ Đang gửi ảnh sang AI Service để phân tích đối tượng & trích xuất chữ OCR...";
+
+        try
+        {
+            var res = await AiResultClient.AnalyzeAsync(a.DuongDan, _maTinBao?.ToString());
+            _ketQuaAiHienTai = res;
+            var soObj = res.Objects?.Count ?? 0;
+            var soOcr = res.Ocr?.Count ?? 0;
+            lblAiTrangThai.ForeColor = UITheme.Green;
+            lblAiTrangThai.Text = $"✔ Phân tích xong: Nhận diện {soObj} đối tượng, trích xuất {soOcr} dòng chữ OCR.";
+
+            var lines = new List<string>();
+            if (res.Objects?.Count > 0)
+            {
+                lines.Add("=== ĐỐI TƯỢNG PHÁT HIỆN (YOLO) ===");
+                foreach (var obj in res.Objects)
+                {
+                    lines.Add($"• {obj.Label} ({obj.Tag ?? "vật thể"}) - Độ tin cậy: {(int)(obj.Confidence * 100)}%");
+                }
+                lines.Add("");
+            }
+            if (res.Ocr?.Count > 0)
+            {
+                lines.Add("=== VĂN BẢN TRÍCH XUẤT (OCR) ===");
+                foreach (var ocr in res.Ocr)
+                {
+                    lines.Add($"• [{ocr.Kind ?? "Văn bản"}] {ocr.Text} ({(int)(ocr.Confidence * 100)}%)");
+                }
+            }
+            if (res.Locations?.Count > 0)
+            {
+                lines.Add("");
+                lines.Add("=== GỢI Ý ĐỊA ĐIỂM TỪ AI ===");
+                foreach (var loc in res.Locations)
+                {
+                    lines.Add($"• {loc.Name} (Độ tin cậy: {(int)(loc.Confidence * 100)}%)");
+                }
+            }
+
+            txtOcr.Text = string.Join(Environment.NewLine, lines);
+            btnApDung.Enabled = true;
+            btnMoKetQuaAi.Enabled = true;
+        }
+        catch (AiServiceException ex)
+        {
+            lblAiTrangThai.ForeColor = UITheme.Red;
+            lblAiTrangThai.Text = $"⚠️ Lỗi AI Service: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            lblAiTrangThai.ForeColor = UITheme.Red;
+            lblAiTrangThai.Text = $"⚠️ Lỗi khi phân tích: {ex.Message}";
+        }
+        finally
+        {
+            btnPhanTichAi.Enabled = lvAnh.SelectedItems.Count > 0;
+        }
+    }
+
+    private void MoKetQuaAiChiTiet()
+    {
+        if (lvAnh.SelectedItems.Count == 0) return;
+        var a = (AnhChon)lvAnh.SelectedItems[0].Tag!;
+        using var f = new FrmKetQuaAI(a.DuongDan, _maTinBao?.ToString());
+        f.LocationApplied += loc =>
+        {
+            if (!string.IsNullOrWhiteSpace(loc.Name))
+            {
+                txtDiaDiem.Text = loc.Name;
+            }
+        };
+        f.ShowDialog(this);
+    }
+
+    private void ApDungKetQuaAi()
+    {
+        if (_ketQuaAiHienTai == null) return;
+        int dem = 0;
+        if (_ketQuaAiHienTai.Locations?.Count > 0)
+        {
+            var topLoc = _ketQuaAiHienTai.Locations[0].Name;
+            if (!string.IsNullOrWhiteSpace(topLoc) && string.IsNullOrWhiteSpace(txtDiaDiem.Text))
+            {
+                txtDiaDiem.Text = topLoc;
+                dem++;
+            }
+        }
+        else if (_ketQuaAiHienTai.Ocr?.Count > 0)
+        {
+            var bienHieu = _ketQuaAiHienTai.Ocr.FirstOrDefault(x => x.Kind == "street_sign");
+            if (bienHieu != null && string.IsNullOrWhiteSpace(txtDiaDiem.Text))
+            {
+                txtDiaDiem.Text = bienHieu.Text;
+                dem++;
+            }
+        }
+
+        var boSung = new List<string>();
+        if (_ketQuaAiHienTai.Objects?.Count > 0)
+        {
+            boSung.Add("Đối tượng hiện trường (AI): " + string.Join(", ", _ketQuaAiHienTai.Objects.Select(o => o.Label)));
+        }
+        if (_ketQuaAiHienTai.Ocr?.Count > 0)
+        {
+            var texts = _ketQuaAiHienTai.Ocr.Where(x => !string.IsNullOrWhiteSpace(x.Text)).Select(x => x.Text).Take(5);
+            boSung.Add("Văn bản OCR nhận diện: " + string.Join("; ", texts));
+        }
+
+        if (boSung.Count > 0)
+        {
+            var textBoSung = string.Join("\n", boSung);
+            if (!txtMoTa.Text.Contains(textBoSung))
+            {
+                txtMoTa.Text = (txtMoTa.Text.Trim() + "\n\n" + textBoSung).Trim();
+                dem++;
+            }
+        }
+
+        if (dem > 0)
+        {
+            MessageBox.Show("Đã áp dụng kết quả phân tích AI (địa điểm và mô tả) vào biểu mẫu.", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        else
+        {
+            MessageBox.Show("Không có thông tin mới từ AI để áp dụng.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
     }
 
     private void XoaAnh()

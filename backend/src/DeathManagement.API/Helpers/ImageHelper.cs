@@ -52,6 +52,7 @@ public static class ImageHelper
             ".jpg" or ".jpeg" => "image/jpeg",
             ".png" => "image/png",
             ".bmp" => "image/bmp",
+            ".webp" => "image/webp",
             _ => throw new InvalidOperationException(
                 "Định dạng ảnh không được hỗ trợ.")
         };

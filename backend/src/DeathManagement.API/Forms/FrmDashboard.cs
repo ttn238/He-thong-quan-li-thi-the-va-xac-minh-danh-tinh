@@ -165,6 +165,14 @@ public class FrmDashboard : Form
         })
         { Visible = AccessControl.Can(ResourceIncident, ActionCreate) };
         mnuNghiepVu.DropDownItems.Add(mnuTinBao);
+        var mnuLapHoSoThiThe = new ToolStripMenuItem("Lập hồ sơ thi thể...", null, (s, e) =>
+        {
+            if (!PermissionUi.Check(this, "BODY", "CREATE")) return;
+            using var f = new FrmLapHoSoThiThe();
+            f.ShowDialog(this);
+        })
+        { Visible = AccessControl.Can("BODY", "CREATE") };
+        mnuNghiepVu.DropDownItems.Add(mnuLapHoSoThiThe);
         mnuNghiepVu.DropDownItems.Add(new ToolStripMenuItem("Hồ sơ người mất tích...")
         { Visible = AccessControl.Can(ResourceMissingPerson, ActionView) });
         mnuNghiepVu.DropDownItems.Add(new ToolStripMenuItem("Đối chiếu & Xác minh danh tính...")
@@ -177,6 +185,12 @@ public class FrmDashboard : Form
         })
         { Visible = AccessControl.Can(ResourceAiResult, ActionView) };
         mnuNghiepVu.DropDownItems.Add(mnuKetQuaAi);
+        mnuNghiepVu.DropDownItems.Add(new ToolStripMenuItem("Danh sách hồ sơ thi thể", null, (_, _) =>
+        {
+            if (!PermissionUi.Check(this, ResourceBody, ActionView)) return;
+            using var form = new FrmQuanLyThiThe();
+            form.ShowDialog(this);
+        }) { Visible = AccessControl.Can(ResourceBody, ActionView) });
         mnuNghiepVu.DropDownItems.Add(new ToolStripSeparator());
         var mnuKhoAnh = new ToolStripMenuItem("🖼️ Kho hình ảnh & Tệp đính kèm...", null, (s, e) =>
         {

@@ -9,6 +9,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.12" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.*" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.*" />
@@ -17,10 +18,13 @@
 	<ItemGroup>
 		<!-- Code của bản Web API (cần ASP.NET) -> không biên dịch trong bản WinForms -->
 		<Compile Remove="Controllers\**" />
+		<Compile Include="Controllers\BodyController.cs" />
 		<Compile Remove="Middleware\**" />
 		<!-- Chép appsettings.json ra thư mục chạy để đọc chuỗi kết nối -->
 		<None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
 		<None Update="appsettings.local.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('appsettings.local.json')" />
 	</ItemGroup>
+
+	<ProjectExtensions><VisualStudio><UserProperties appsettings_1json__JsonSchema="" /></VisualStudio></ProjectExtensions>
 
 </Project>

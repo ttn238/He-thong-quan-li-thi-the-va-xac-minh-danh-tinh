@@ -1,5 +1,36 @@
 # Tài Liệu API Hệ Thống (RESTful API Documentation)
 
+## Danh sách thi thể task 6.2
+
+WinForms mở **Quản lý hồ sơ → Danh sách hồ sơ thi thể**. Màn hình dùng `BodyService` và SQL Server thật. Các bộ lọc ngày trên giao diện bao gồm toàn bộ ngày kết thúc.
+
+Endpoint đã triển khai là `GET /api/bodies`. Chạy cùng chương trình ở chế độ HTTP riêng bằng lệnh sau từ thư mục gốc repo.
+
+```powershell
+dotnet run --project backend/src/DeathManagement.API -- --body-api --urls http://127.0.0.1:5086
+```
+
+Chế độ này cần .NET 10 ASP.NET Core và Windows Desktop runtime. Chạy WinForms và HTTP host với cùng `Jwt__Key`, `Jwt__Issuer` và `Jwt__Audience` để dùng token đăng nhập desktop. Nếu khóa dưới 32 byte, cơ chế JWT hiện tại sinh khóa ngẫu nhiên riêng cho từng tiến trình, nên token không dùng chéo được. Chuỗi kết nối đọc từ `appsettings.json` trong output và biến `ConnectionStrings__DefaultConnection`.
+
+Gửi `Authorization: Bearer <token>` với quyền `BODY:VIEW`. Các tham số query là `tuKhoa`, `trangThai`, `gioiTinh`, `tuNgay`, `denNgay`, `trang` (mặc định 1), `soLuong` (mặc định 20, tối đa 100). Ngày theo ISO 8601, hai giới hạn được tính bao gồm chính thời điểm truyền vào. Từ khóa tìm theo chuỗi mã hồ sơ, địa điểm hoặc đặc điểm. Sắp xếp mã hồ sơ giảm dần để phân trang ổn định.
+
+```text
+GET /api/bodies?tuKhoa=1&trangThai=MoiTiepNhan&gioiTinh=Nam&tuNgay=2020-01-01T00:00:00&denNgay=2026-12-31T23:59:59&trang=1&soLuong=20
+```
+
+JSON trả về có `items`, `total`, `trang`, `soLuong`. Mỗi hồ sơ có mã, thời gian phát hiện, trạng thái, giới tính và tuổi ước lượng. Quyền đầy đủ nhận thêm địa điểm, đặc điểm, chiều cao và mã tin báo. Với `NHA_XAC` hoặc quyền `PARTIAL`, truy vấn sử dụng `v_HoSoThiTheNhaXac`, trả thêm mã vị trí, khu, tủ, ngăn. Các trường ngoài view có giá trị null và được bỏ khỏi JSON HTTP. Tìm kiếm và tổng số của nhóm này chỉ dựa trên mã hồ sơ và các bộ lọc công khai, không dựa vào dữ liệu bị ẩn.
+
+HTTP 401 khi thiếu/token sai, 403 khi thiếu quyền hoặc phạm vi OWN chưa được hỗ trợ, 400 khi bộ lọc sai và 200 với `items=[]` khi không có kết quả. Endpoint dùng riêng HTTP host của chương trình WinForms, không nằm trong `DeathManagement.ImageApi`.
+
+Kiểm thử hồi quy nằm tại `tests/backend/DeathManagement.Tests/BodyListTests.cs`. Ca SQL Server chỉ thực hiện truy vấn đọc khi đặt `QLTT_TEST_DB`.
+
+```powershell
+$env:QLTT_TEST_DB='Server=(localdb)\MSSQLLocalDB;Database=QL_XACMINHTHITHE;Trusted_Connection=True;TrustServerCertificate=True'
+dotnet test tests/backend/DeathManagement.Tests/DeathManagement.Tests.csproj --filter FullyQualifiedName~BodyListTests
+```
+
+Đã xác minh ngày 20/11/2026 với 5 ca đạt khi bật kiểm tra LocalDB. HTTP thực tế trả 200 cho cán bộ và nhà xác, 403 cho token thiếu quyền, 401 cho truy cập ẩn danh. JSON nhà xác không chứa `diaDiem`. Bộ lọc ngày, trạng thái, giới tính, mã và phân trang đã truy vấn được trên dữ liệu LocalDB.
+
 ## 1. Tiêu chuẩn thiết kế
 - **Base URL:** `https://api.domain.vn/api/v1`
 - **Định dạng dữ liệu:** `application/json`
