@@ -17,8 +17,15 @@ internal static class BodyApiHost
         var builder = WebApplication.CreateBuilder(args);
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddScoped<ApplicationDbContext>(_ => Program.NewDb());
+        builder.Services.AddScoped<IAuthService, AuthService>();
+        builder.Services.AddScoped<IUserRepository, UserRepository>();
+        builder.Services.AddScoped<IUserService, UserService>();
+        builder.Services.AddScoped<IRoleRepository, RoleRepository>();
+        builder.Services.AddScoped<IRoleService, RoleService>();
         builder.Services.AddScoped<IBodyRepository, BodyRepository>();
         builder.Services.AddScoped<IBodyService, BodyService>();
+        builder.Services.AddScoped<IStorageRepository, StorageRepository>();
+        builder.Services.AddScoped<IStorageService, StorageService>();
         builder.Services.AddControllers().AddJsonOptions(options =>
             options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull);
         var app = builder.Build();
@@ -31,9 +38,15 @@ internal static class BodyApiHost
             context.User = JwtTokenService.Validate(header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
                 ? header[7..] : null) ?? new System.Security.Claims.ClaimsPrincipal();
             try { await next(context); }
-            catch (Exception ex) when (ex is UnauthenticatedException or ForbiddenException or ArgumentException)
+            catch (Exception ex) when (ex is UnauthenticatedException or ForbiddenException or KeyNotFoundException or ArgumentException or InvalidOperationException)
             {
-                context.Response.StatusCode = ex is UnauthenticatedException ? 401 : ex is ForbiddenException ? 403 : 400;
+                context.Response.StatusCode = ex switch
+                {
+                    UnauthenticatedException => 401,
+                    ForbiddenException => 403,
+                    KeyNotFoundException => 404,
+                    _ => 400
+                };
                 await context.Response.WriteAsJsonAsync(new { message = ex.Message });
             }
         });

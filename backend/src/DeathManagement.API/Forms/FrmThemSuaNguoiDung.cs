@@ -229,6 +229,12 @@ public class FrmThemSuaNguoiDung : Form
             var email = string.IsNullOrWhiteSpace(txtEmail.Text) ? null : txtEmail.Text.Trim();
             var sdt = string.IsNullOrWhiteSpace(txtSoDienThoai.Text) ? null : txtSoDienThoai.Text.Trim();
             var cccd = string.IsNullOrWhiteSpace(txtCCCD.Text) ? null : txtCCCD.Text.Trim();
+            if (email == null && sdt == null)
+            {
+                MessageBox.Show("Vui lòng nhập ít nhất một thông tin liên hệ (Email hoặc Số điện thoại).", "Thiếu thông tin", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtEmail.Focus();
+                return;
+            }
             var idHienTai = _userId ?? 0;
             if (email != null && await db.Users.AnyAsync(x => x.Email == email && x.MaTaiKhoan != idHienTai))
             { MessageBox.Show("Email đã được sử dụng bởi tài khoản khác.", "Trùng lặp", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }

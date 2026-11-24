@@ -127,12 +127,7 @@ public class FrmQuanLyNguoiDung : Form
         btnThem.FlatAppearance.BorderSize = 0;
         btnThem.Click += (s, e) =>
         {
-
-            if (!PermissionUi.Check(this, ResourceAccount, ActionCreate)) return;   
-            using var f = new FrmThemSuaNguoiDung();
-            if (f.ShowDialog() == DialogResult.OK) LoadUsers();
-        };
-        {
+            if (!PermissionUi.Check(this, ResourceAccount, ActionCreate)) return;
             using var f = new FrmThemSuaNguoiDung();
             if (f.ShowDialog() == DialogResult.OK) LoadUsers();
         };

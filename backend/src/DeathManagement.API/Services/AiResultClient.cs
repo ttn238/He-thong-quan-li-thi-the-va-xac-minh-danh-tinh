@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Headers;
+﻿using System.Diagnostics;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -34,9 +35,12 @@ public static class AiResultClient
         Timeout = TimeSpan.FromSeconds(Math.Max(5, Program.AiTimeoutSeconds))
     });
 
+    private static readonly SemaphoreSlim AutoStartLock = new(1, 1);
+    private static Process? _localAiProcess;
+
     public static string BaseUrl => Program.AiBaseUrl.TrimEnd('/');
 
-    public static async Task<bool> PingAsync(CancellationToken ct = default)
+    private static async Task<bool> PingOnceAsync(CancellationToken ct = default)
     {
         try
         {
@@ -46,6 +50,80 @@ public static class AiResultClient
             return res.IsSuccessStatusCode;
         }
         catch { return false; }
+    }
+
+    public static async Task<bool> PingAsync(CancellationToken ct = default)
+    {
+        if (await PingOnceAsync(ct)) return true;
+        return await EnsureLocalServerRunningAsync(ct);
+    }
+
+    private static async Task<bool> EnsureLocalServerRunningAsync(CancellationToken ct = default)
+    {
+        if (!Uri.TryCreate(BaseUrl, UriKind.Absolute, out var uri) ||
+            (uri.Host != "localhost" && uri.Host != "127.0.0.1"))
+            return false;
+
+        await AutoStartLock.WaitAsync(ct);
+        try
+        {
+            if (await PingOnceAsync(ct)) return true;
+
+            if (_localAiProcess == null || _localAiProcess.HasExited)
+            {
+                var aiDir = FindAiServiceDirectory();
+                if (aiDir == null) return false;
+
+                var venvPython = Path.Combine(aiDir, ".venv", "Scripts", "python.exe");
+                var pythonExe = File.Exists(venvPython) ? venvPython : "python";
+                var mainPy = Path.Combine(aiDir, "main.py");
+                if (!File.Exists(mainPy)) return false;
+
+                var psi = new ProcessStartInfo
+                {
+                    FileName = pythonExe,
+                    Arguments = $"-m uvicorn main:app --host 127.0.0.1 --port {uri.Port}",
+                    WorkingDirectory = aiDir,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                _localAiProcess = Process.Start(psi);
+            }
+
+            // Chờ uvicorn + preload_models khởi động xong (tối đa ~15 giây)
+            for (int i = 0; i < 30; i++)
+            {
+                await Task.Delay(500, ct);
+                if (await PingOnceAsync(ct)) return true;
+                if (_localAiProcess is { HasExited: true }) break;
+            }
+
+            return await PingOnceAsync(ct);
+        }
+        catch
+        {
+            return false;
+        }
+        finally
+        {
+            AutoStartLock.Release();
+        }
+    }
+
+    private static string? FindAiServiceDirectory()
+    {
+        foreach (var start in new[] { AppContext.BaseDirectory, Directory.GetCurrentDirectory() })
+        {
+            var dir = new DirectoryInfo(start);
+            while (dir != null)
+            {
+                var candidate = Path.Combine(dir.FullName, "ai-service");
+                if (File.Exists(Path.Combine(candidate, "main.py")))
+                    return candidate;
+                dir = dir.Parent;
+            }
+        }
+        return null;
     }
 
     public static async Task<AiResultDto> AnalyzeAsync(string filePath, string? linkedRecordId, CancellationToken ct = default)
@@ -121,6 +199,7 @@ public static class AiResultClient
         var endpoint = BaseUrl + path;
         try
         {
+            await EnsureLocalServerRunningAsync(ct);
             using var res = await send();
             var text = await res.Content.ReadAsStringAsync(ct);
             if (!res.IsSuccessStatusCode) throw FromError(res, text, endpoint);

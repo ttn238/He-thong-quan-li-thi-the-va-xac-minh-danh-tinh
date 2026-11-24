@@ -66,8 +66,9 @@ public sealed class FrmLapHoSoThiThe : Form
     // Chiều cao
     private readonly NumericUpDown nudChieuCao = new()
     {
-        Minimum = 0,
+        Minimum = 1,
         Maximum = 300,
+        Value = 165,
         DecimalPlaces = 1,
         Font = UITheme.FontRegular(9.5f),
         Dock = DockStyle.Fill

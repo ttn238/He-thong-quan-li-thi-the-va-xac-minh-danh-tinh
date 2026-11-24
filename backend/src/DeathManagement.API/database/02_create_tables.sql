@@ -205,7 +205,11 @@ CREATE TABLE HoSoThiThe
         CHECK (TuoiUocLuong IS NULL OR TuoiUocLuong BETWEEN 0 AND 130),
 
     CONSTRAINT CK_HoSoThiThe_ChieuCao
-        CHECK (ChieuCao IS NULL OR ChieuCao > 0)
+        CHECK (ChieuCao IS NULL OR ChieuCao > 0),
+
+    CONSTRAINT CK_HoSoThiThe_TrangThai
+        CHECK (TrangThai IN (N'MoiTiepNhan', N'DangLuuGiu', N'DangXacMinh', N'TiepTucLuuGiu',
+                             N'DaXacDinh', N'DaBanGiao', N'DongHoSo'))
 );
 GO
  

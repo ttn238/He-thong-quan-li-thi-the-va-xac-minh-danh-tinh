@@ -1,10 +1,9 @@
 using DeathManagement.API.DTOs.Body;
-using DeathManagement.API.Entities;
 
 namespace DeathManagement.API.Services.Interfaces;
 
 /// <summary>
-/// Giao diện service nghiệp vụ quản lý hồ sơ thi thể (Task 6.1).
+/// Giao diện service nghiệp vụ quản lý hồ sơ thi thể và luồng trạng thái (Task 6.1 & State Machine).
 /// </summary>
 public interface IBodyService
 {
@@ -18,6 +17,12 @@ public interface IBodyService
     Task<(List<BodyDto> Items, int Total)> LayDanhSachAsync(string? tuKhoa, string? trangThai, int trang = 1, int soLuong = 20);
     Task<(List<BodyDto> Items, int Total)> LayDanhSachAsync(BodyFilterRequest filter);
 
-    /// <summary>Cập nhật thông tin hồ sơ. Yêu cầu quyền BODY:UPDATE.</summary>
+    /// <summary>Cập nhật thông tin hồ sơ (và chuyển trạng thái nếu có). Yêu cầu quyền BODY:UPDATE.</summary>
     Task CapNhatAsync(long maHoSoThiThe, UpdateBodyRequest request);
+
+    /// <summary>Thay đổi trạng thái hồ sơ theo quy tắc state machine, kiểm tra quyền và ghi lịch sử. Yêu cầu quyền BODY:UPDATE.</summary>
+    Task<BodyDto> ChuyenTrangThaiAsync(long maHoSoThiThe, string trangThaiMoi, string? lyDo = null);
+
+    /// <summary>Lấy lịch sử thay đổi trạng thái của một hồ sơ thi thể. Yêu cầu quyền BODY:VIEW.</summary>
+    Task<List<BodyStatusHistoryDto>> LayLichSuTrangThaiAsync(long maHoSoThiThe);
 }

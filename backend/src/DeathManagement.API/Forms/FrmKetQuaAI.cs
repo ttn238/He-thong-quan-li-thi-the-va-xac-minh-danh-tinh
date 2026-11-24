@@ -42,7 +42,7 @@ public class FrmKetQuaAI : Form
     private AiServiceException? _ex;
     private bool _busy, _demo = true, _hienBox = true, _anhMau;
     private AiMau _mau = AiMau.CoKetQua;
-    private string? _filePath, _idCanMo;
+    private string? _filePath, _idCanMo, _linkedRecordId;
     private Bitmap? _anh;
     private AiLocationItem? _diaDiemChon;
     private CancellationTokenSource? _cts;
@@ -65,7 +65,7 @@ public class FrmKetQuaAI : Form
     private readonly Panel pnlBody = new() { Dock = DockStyle.Fill, AutoScroll = true, BackColor = CSurface };
     private readonly Label lblCrumb = new() { AutoSize = true, Font = B9, ForeColor = CText, Location = new Point(16, 21) };
     private readonly Label lblNguon = new() { AutoSize = true, Font = F8, ForeColor = CSub, Margin = new Padding(14, 9, 0, 0) };
-    private readonly Label lblKetNoi = new() { Dock = DockStyle.Right, AutoSize = true, Font = B8, ForeColor = Color.Gold, Padding = new Padding(0, 15, 16, 0), Text = "● AI-SERVICE: ĐANG KIỂM TRA..." };
+    private readonly Label lblKetNoi = new() { Dock = DockStyle.Right, AutoSize = true, Font = B8, ForeColor = Color.Gold, Padding = new Padding(0, 15, 16, 0), Text = "● AI-SERVICE: ĐANG KIỂM TRA...", Cursor = Cursors.Hand };
     private readonly FlowLayoutPanel pnlSwitch = new() { BackColor = CChip, Height = 84, Padding = new Padding(10, 8, 10, 4), WrapContents = true };
     private readonly RadioButton[] rdoMau = new RadioButton[6];
     private readonly Button btnLamMoi = NutHead("⟳  Làm mới (F5)", 130, true);
@@ -103,6 +103,7 @@ public class FrmKetQuaAI : Form
     public FrmKetQuaAI(string? filePath, string? linkedRecordId = null) : this()
     {
         _filePath = filePath;
+        _linkedRecordId = linkedRecordId;
         _idCanMo = null;
     }
 
@@ -160,6 +161,7 @@ public class FrmKetQuaAI : Form
         new ToolTip().SetToolTip(btnIn, "Chưa hỗ trợ in kết quả");
         btnDong.Click += (s, e) => Close();
         btnLamMoi.Click += (s, e) => Chay(LamMoiAsync);
+        lblKetNoi.Click += (s, e) => Chay(KiemTraKetNoiAsync);
 
         // Banner khuyến cáo pháp lý
         _banner = new Row(96, (row, g, r) =>
@@ -1029,6 +1031,11 @@ public class FrmKetQuaAI : Form
 
     private async Task KiemTraKetNoiAsync()
     {
+        if (!IsDisposed)
+        {
+            lblKetNoi.Text = "● AI-SERVICE: ĐANG KẾT NỐI...";
+            lblKetNoi.ForeColor = Color.Gold;
+        }
         bool ok = await AiResultClient.PingAsync();
         if (IsDisposed) return;
         lblKetNoi.Text = ok ? "● AI-SERVICE: ĐÃ KẾT NỐI" : "● AI-SERVICE: KHÔNG KẾT NỐI ĐƯỢC";
@@ -1092,9 +1099,11 @@ public class FrmKetQuaAI : Form
         Render();
         try
         {
-            var kq = await AiResultClient.AnalyzeAsync(path, null, token);
+            var kq = await AiResultClient.AnalyzeAsync(path, _linkedRecordId, token);
             if (token.IsCancellationRequested || IsDisposed) return;
             _data = kq;
+            lblKetNoi.Text = "● AI-SERVICE: ĐÃ KẾT NỐI";
+            lblKetNoi.ForeColor = Color.LightGreen;
         }
         catch (OperationCanceledException) { return; }
         catch (AiServiceException ex) { _ex = ex; }
@@ -1128,6 +1137,7 @@ public class FrmKetQuaAI : Form
 
     private async Task LamMoiAsync()
     {
+        await KiemTraKetNoiAsync();
         if (_demo) { HienMau(_mau); return; }
         if (_data == null || string.IsNullOrEmpty(_data.RequestId))
         {

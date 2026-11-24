@@ -55,7 +55,40 @@ public sealed class AuthorizationSaveChangesInterceptor : SaveChangesInterceptor
             {
                 case User user: CheckUser(entry, user); break;
                 case EntityImage img: CheckImage(entry, img); break;
+                case Body body: CheckBody(entry, body); break;
             }
+        }
+    }
+
+    // ------------------------------------------------------------------ HỒ SƠ THI THỂ
+    private static void CheckBody(EntityEntry entry, Body body)
+    {
+        switch (entry.State)
+        {
+            case EntityState.Added:
+                AccessControl.Require(ResourceBody, ActionCreate);
+                break;
+
+            case EntityState.Modified:
+                {
+                    AccessControl.Require(ResourceBody, ActionUpdate);
+                    var prop = entry.Property(nameof(Body.TrangThai));
+                    if (prop.IsModified)
+                    {
+                        var oldStatus = prop.OriginalValue?.ToString();
+                        var newStatus = prop.CurrentValue?.ToString();
+                        if (!Body.IsValidStatus(newStatus))
+                            throw new ArgumentException($"Trạng thái hồ sơ '{newStatus}' không hợp lệ.");
+                        if (!string.IsNullOrEmpty(oldStatus) && oldStatus != newStatus && !Body.CanTransition(oldStatus, newStatus))
+                            throw new InvalidOperationException(
+                                $"Không cho phép chuyển trạng thái hồ sơ từ '{Body.GetStatusLabel(oldStatus)}' sang '{Body.GetStatusLabel(newStatus)}'.");
+                    }
+                    break;
+                }
+
+            case EntityState.Deleted:
+                AccessControl.Require(ResourceBody, ActionDelete);
+                break;
         }
     }
 

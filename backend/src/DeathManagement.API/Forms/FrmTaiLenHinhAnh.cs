@@ -335,44 +335,41 @@ public class FrmTaiLenHinhAnh : Form
             ? _danhSachDuongDanAnh[0]
             : $"Đã chọn {_danhSachDuongDanAnh.Count}/{MaxSoAnh} ảnh";
 
-        try
-        {
-            using var stream = File.OpenRead(_danhSachDuongDanAnh[0]);
-            using var temp = System.Drawing.Image.FromStream(stream);
-
-            var anhCu = picPreview.Image;
-            picPreview.Image = new Bitmap(temp);
-            anhCu?.Dispose();
-
-            lblTrangThai.Visible = true;
-            lblTrangThai.Text =
-                $"Đã chọn {_danhSachDuongDanAnh.Count}/{MaxSoAnh} ảnh hợp lệ.";
-        }
-        catch (Exception ex)
-        {
-            _danhSachDuongDanAnh.Clear();
-            txtDuongDanTep.Clear();
-
-            MessageBox.Show(
-                "Không thể xem trước ảnh: " + ex.Message,
-                "Lỗi ảnh",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Warning);
-        }
+        HienThiAnhXemTruoc(_danhSachDuongDanAnh[0]);
+        lblTrangThai.Visible = true;
+        lblTrangThai.Text =
+            $"Đã chọn {_danhSachDuongDanAnh.Count}/{MaxSoAnh} ảnh hợp lệ.";
     }
-    private void NapTepDuocChon(string path)
+
+    private void HienThiAnhXemTruoc(string path)
     {
-        txtDuongDanTep.Text = path;
+        var anhCu = picPreview.Image;
         try
         {
-            using var stream = new MemoryStream(File.ReadAllBytes(path));
+            using var stream = File.OpenRead(path);
             using var temp = System.Drawing.Image.FromStream(stream);
             picPreview.Image = new Bitmap(temp);
         }
         catch
         {
-            picPreview.Image = null;
+            var bmp = new Bitmap(280, 180);
+            using var g = Graphics.FromImage(bmp);
+            g.Clear(Color.FromArgb(40, 44, 52));
+            using var f = UITheme.FontBold(9.5f);
+            using var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+            g.DrawString($"Tệp ảnh hợp lệ ({Path.GetExtension(path).ToUpperInvariant()})\n{Path.GetFileName(path)}", f, Brushes.LightGray, new RectangleF(10, 10, 260, 160), sf);
+            picPreview.Image = bmp;
         }
+        finally
+        {
+            anhCu?.Dispose();
+        }
+    }
+
+    private void NapTepDuocChon(string path)
+    {
+        txtDuongDanTep.Text = path;
+        HienThiAnhXemTruoc(path);
     }
 
 
@@ -610,7 +607,7 @@ public class FrmTaiLenHinhAnh : Form
             {
                 MessageBox.Show(
                     $"Tệp '{Path.GetFileName(path)}' không hợp lệ.\n" +
-                    "Chỉ chấp nhận JPG, JPEG, PNG hoặc BMP, tối đa 10 MB mỗi ảnh.",
+                    "Chỉ chấp nhận JPG, JPEG, PNG, BMP hoặc WEBP, tối đa 10 MB mỗi ảnh.",
                     "Không thể thêm ảnh",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
@@ -624,29 +621,9 @@ public class FrmTaiLenHinhAnh : Form
             ? _danhSachDuongDanAnh[0]
             : $"Đã chọn {_danhSachDuongDanAnh.Count}/{MaxSoAnh} ảnh";
 
-        try
-        {
-            using var stream = File.OpenRead(_danhSachDuongDanAnh[0]);
-            using var temp = System.Drawing.Image.FromStream(stream);
-
-            var anhCu = picPreview.Image;
-            picPreview.Image = new Bitmap(temp);
-            anhCu?.Dispose();
-
-            lblTrangThai.Visible = true;
-            lblTrangThai.Text = $"Đã chọn {_danhSachDuongDanAnh.Count}/{MaxSoAnh} ảnh hợp lệ.";
-        }
-        catch (Exception ex)
-        {
-            _danhSachDuongDanAnh.Clear();
-            txtDuongDanTep.Clear();
-
-            MessageBox.Show(
-                "Không thể hiển thị ảnh xem trước: " + ex.Message,
-                "Lỗi ảnh",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Warning);
-        }
+        HienThiAnhXemTruoc(_danhSachDuongDanAnh[0]);
+        lblTrangThai.Visible = true;
+        lblTrangThai.Text = $"Đã chọn {_danhSachDuongDanAnh.Count}/{MaxSoAnh} ảnh hợp lệ.";
     }
 
     private bool ThemVaoDanhSach(IEnumerable<string> files)

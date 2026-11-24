@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using DeathManagement.API.Data;
 using DeathManagement.API.DTOs.Body;
 using DeathManagement.API.Entities;
@@ -8,10 +9,12 @@ using Microsoft.EntityFrameworkCore;
 namespace DeathManagement.API.Repositories;
 
 /// <summary>
-/// Triển khai repository hồ sơ thi thể, gọi trực tiếp Stored Procedures SQL Server.
+/// Triển khai repository hồ sơ thi thể, gọi Stored Procedures SQL Server và EF Core.
 /// </summary>
 public class BodyRepository(ApplicationDbContext db) : IBodyRepository
 {
+    private static readonly Regex StatusArrowRegex = new(@"(\w+)\s*->\s*(\w+)", RegexOptions.Compiled);
+
     /// <inheritdoc />
     public async Task<long> TaoHoSoAsync(CreateBodyRequest request, long maTaiKhoan)
     {
@@ -47,6 +50,34 @@ public class BodyRepository(ApplicationDbContext db) : IBodyRepository
     }
 
     /// <inheritdoc />
+    public async Task<BodyDto?> LayChiTietDtoAsync(long maHoSoThiThe, bool nhaXac)
+    {
+        if (nhaXac)
+        {
+            return await db.Database.SqlQuery<BodyDto>($"""
+                SELECT MaHoSoThiThe, TrangThai, ThoiGianPhatHien, GioiTinh, TuoiUocLuong,
+                       MaViTri, Khu, Tu, Ngan,
+                       CAST(NULL AS nvarchar(255)) AS DiaDiem,
+                       CAST(NULL AS decimal(5,2)) AS ChieuCao,
+                       CAST(NULL AS nvarchar(max)) AS DacDiemCoThe,
+                       CAST(NULL AS int) AS MaTinBao
+                FROM dbo.v_HoSoThiTheNhaXac
+                WHERE MaHoSoThiThe = {maHoSoThiThe}
+                """).FirstOrDefaultAsync();
+        }
+
+        return await db.Database.SqlQuery<BodyDto>($"""
+            SELECT h.MaHoSoThiThe, h.ThoiGianPhatHien, h.DiaDiem, h.TrangThai,
+                   h.GioiTinh, h.TuoiUocLuong, h.ChieuCao, h.DacDiemCoThe, h.MaTinBao,
+                   vt.MaViTri, v.Khu, v.Tu, v.Ngan
+            FROM dbo.HoSoThiThe h
+            LEFT JOIN dbo.v_ViTriHienTai vt ON vt.MaHoSoThiThe = h.MaHoSoThiThe
+            LEFT JOIN dbo.ViTriLuuTru v ON v.MaViTri = vt.MaViTri
+            WHERE h.MaHoSoThiThe = {maHoSoThiThe}
+            """).FirstOrDefaultAsync();
+    }
+
+    /// <inheritdoc />
     public async Task<(List<BodyDto> Items, int Total)> LayDanhSachAsync(
         string? tuKhoa, string? trangThai, int trang, int soLuong)
         => await LayDanhSachAsync(new BodyFilterRequest
@@ -65,13 +96,14 @@ public class BodyRepository(ApplicationDbContext db) : IBodyRepository
                        CAST(NULL AS int) AS MaTinBao
                 FROM dbo.v_HoSoThiTheNhaXac
                 """)
-            : db.Set<Body>().AsNoTracking().Select(x => new BodyDto
-            {
-                MaHoSoThiThe = x.MaHoSoThiThe, ThoiGianPhatHien = x.ThoiGianPhatHien,
-                DiaDiem = x.DiaDiem, TrangThai = x.TrangThai, GioiTinh = x.GioiTinh,
-                TuoiUocLuong = x.TuoiUocLuong, ChieuCao = x.ChieuCao,
-                DacDiemCoThe = x.DacDiemCoThe, MaTinBao = x.MaTinBao
-            });
+            : db.Database.SqlQuery<BodyDto>($"""
+                SELECT h.MaHoSoThiThe, h.ThoiGianPhatHien, h.DiaDiem, h.TrangThai,
+                       h.GioiTinh, h.TuoiUocLuong, h.ChieuCao, h.DacDiemCoThe, h.MaTinBao,
+                       vt.MaViTri, v.Khu, v.Tu, v.Ngan
+                FROM dbo.HoSoThiThe h
+                LEFT JOIN dbo.v_ViTriHienTai vt ON vt.MaHoSoThiThe = h.MaHoSoThiThe
+                LEFT JOIN dbo.ViTriLuuTru v ON v.MaViTri = vt.MaViTri
+                """);
 
         if (!string.IsNullOrWhiteSpace(filter.TrangThai))
             query = query.Where(x => x.TrangThai == filter.TrangThai);
@@ -105,27 +137,217 @@ public class BodyRepository(ApplicationDbContext db) : IBodyRepository
     /// <inheritdoc />
     public async Task CapNhatAsync(long maHoSoThiThe, UpdateBodyRequest request, long maTaiKhoan)
     {
-        // Lấy bản ghi hiện tại
         var body = await db.Set<Body>().FindAsync(maHoSoThiThe)
                    ?? throw new KeyNotFoundException($"Không tìm thấy hồ sơ thi thể #{maHoSoThiThe}.");
 
-        if (body.TrangThai == "DongHoSo")
+        // Nếu chỉ cập nhật thông tin trên hồ sơ đã đóng (mà không phải mở lại sang TiepTucLuuGiu) thì chặn
+        var isReopening = !string.IsNullOrWhiteSpace(request.TrangThai)
+                          && body.TrangThai == Body.StatusDongHoSo
+                          && request.TrangThai.Trim() == Body.StatusTiepTucLuuGiu;
+
+        if (body.TrangThai == Body.StatusDongHoSo && !isReopening)
             throw new InvalidOperationException("Hồ sơ đã đóng. Vui lòng mở lại hồ sơ trước khi sửa đổi.");
 
-        // Áp dụng thay đổi (các trường null = giữ nguyên)
-        if (request.ThoiGianPhatHien.HasValue)
-            body.ThoiGianPhatHien = request.ThoiGianPhatHien.Value;
-        if (request.DiaDiem != null)
-            body.DiaDiem = request.DiaDiem;
-        if (request.GioiTinh != null)
-            body.GioiTinh = request.GioiTinh;
-        if (request.TuoiUocLuong.HasValue)
-            body.TuoiUocLuong = request.TuoiUocLuong;
-        if (request.ChieuCao.HasValue)
-            body.ChieuCao = request.ChieuCao;
-        if (request.DacDiemCoThe != null)
-            body.DacDiemCoThe = request.DacDiemCoThe;
+        // 1. Nếu có yêu cầu chuyển trạng thái đi kèm thì xử lý chuyển trạng thái trước
+        if (!string.IsNullOrWhiteSpace(request.TrangThai) && request.TrangThai.Trim() != body.TrangThai)
+        {
+            await ChuyenTrangThaiAsync(maHoSoThiThe, request.TrangThai.Trim(), request.LyDoChuyenTrangThai, maTaiKhoan);
+            await db.Entry(body).ReloadAsync();
+        }
 
-        await db.SaveChangesAsync();
+        // 2. Áp dụng thay đổi thông tin (các trường null = giữ nguyên)
+        bool hasFieldChange = false;
+        if (request.ThoiGianPhatHien.HasValue && body.ThoiGianPhatHien != request.ThoiGianPhatHien.Value)
+        {
+            body.ThoiGianPhatHien = request.ThoiGianPhatHien.Value;
+            hasFieldChange = true;
+        }
+        if (request.DiaDiem != null && body.DiaDiem != request.DiaDiem)
+        {
+            body.DiaDiem = request.DiaDiem;
+            hasFieldChange = true;
+        }
+        if (request.GioiTinh != null && body.GioiTinh != request.GioiTinh)
+        {
+            body.GioiTinh = request.GioiTinh;
+            hasFieldChange = true;
+        }
+        if (request.TuoiUocLuong.HasValue && body.TuoiUocLuong != request.TuoiUocLuong)
+        {
+            body.TuoiUocLuong = request.TuoiUocLuong;
+            hasFieldChange = true;
+        }
+        if (request.ChieuCao.HasValue && body.ChieuCao != request.ChieuCao)
+        {
+            body.ChieuCao = request.ChieuCao;
+            hasFieldChange = true;
+        }
+        if (request.DacDiemCoThe != null && body.DacDiemCoThe != request.DacDiemCoThe)
+        {
+            body.DacDiemCoThe = request.DacDiemCoThe;
+            hasFieldChange = true;
+        }
+
+        if (hasFieldChange)
+        {
+            await db.SaveChangesAsync();
+        }
     }
+
+    /// <inheritdoc />
+    public async Task ChuyenTrangThaiAsync(long maHoSoThiThe, string trangThaiMoi, string? lyDo, long maTaiKhoan)
+    {
+        var body = await db.Set<Body>().FindAsync(maHoSoThiThe)
+                   ?? throw new KeyNotFoundException($"Không tìm thấy hồ sơ thi thể #{maHoSoThiThe}.");
+
+        var trangThaiCu = body.TrangThai;
+        var dich = trangThaiMoi.Trim();
+
+        if (!Body.IsValidStatus(dich))
+            throw new ArgumentException($"Trạng thái '{dich}' không hợp lệ.");
+
+        if (trangThaiCu == dich)
+            throw new InvalidOperationException($"Hồ sơ #{maHoSoThiThe} đang ở trạng thái '{Body.GetStatusLabel(dich)}'.");
+
+        if (!Body.CanTransition(trangThaiCu, dich))
+        {
+            var allowed = Body.GetAllowedNextStatuses(trangThaiCu);
+            var allowedText = allowed.Count > 0
+                ? string.Join(", ", allowed.Select(s => $"{Body.GetStatusLabel(s)} ({s})"))
+                : "Không có trạng thái kế tiếp";
+            throw new InvalidOperationException(
+                $"Không cho phép chuyển trạng thái hồ sơ từ '{Body.GetStatusLabel(trangThaiCu)}' ({trangThaiCu}) sang '{Body.GetStatusLabel(dich)}' ({dich}). Trạng thái kế tiếp hợp lệ: {allowedText}.");
+        }
+
+        var ghiChu = string.IsNullOrWhiteSpace(lyDo) ? null : lyDo.Trim();
+
+        // Sử dụng Stored Procedure chuyên biệt cho Đóng hồ sơ và Mở lại hồ sơ
+        if (trangThaiCu == Body.StatusDaBanGiao && dich == Body.StatusDongHoSo)
+        {
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"EXEC sp_DongHoSoThiThe @MaHoSoThiThe = {maHoSoThiThe}, @MaTaiKhoan = {maTaiKhoan}");
+
+            if (!string.IsNullOrEmpty(ghiChu))
+            {
+                var doiTuong = Cut255($"HoSoThiThe#{maHoSoThiThe} {trangThaiCu} -> {dich}: {ghiChu}");
+                await db.Database.ExecuteSqlInterpolatedAsync(
+                    $"EXEC sp_GhiNhatKy @HanhDong = {NhatKyAction(dich)}, @DoiTuongTacDong = {doiTuong}, @MaTaiKhoan = {maTaiKhoan}");
+            }
+            return;
+        }
+
+        if (trangThaiCu == Body.StatusDongHoSo && dich == Body.StatusTiepTucLuuGiu)
+        {
+            if (string.IsNullOrWhiteSpace(ghiChu))
+                throw new ArgumentException("Mở lại hồ sơ đã đóng bắt buộc phải nhập lý do.");
+
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"EXEC sp_MoLaiHoSoThiThe @MaHoSoThiThe = {maHoSoThiThe}, @MaTaiKhoan = {maTaiKhoan}, @LyDo = {ghiChu}");
+            return;
+        }
+
+        // Các chuyển đổi trạng thái hợp lệ khác: cập nhật trên cùng kết nối để giữ session_context cho trigger trg_Audit_HoSoThiThe
+        var conn = db.Database.GetDbConnection();
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen) await conn.OpenAsync();
+        try
+        {
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"EXEC sys.sp_set_session_context @key = N'user_id', @value = {maTaiKhoan}");
+
+            body.TrangThai = dich;
+            await db.SaveChangesAsync();
+
+            // Nếu người dùng có nhập lý do/ghi chú chuyển trạng thái thì lưu thêm dòng nhật ký chi tiết
+            if (!string.IsNullOrEmpty(ghiChu))
+            {
+                var doiTuong = Cut255($"HoSoThiThe#{maHoSoThiThe} {trangThaiCu} -> {dich}: {ghiChu}");
+                await db.Database.ExecuteSqlInterpolatedAsync(
+                    $"EXEC sp_GhiNhatKy @HanhDong = {NhatKyAction(dich)}, @DoiTuongTacDong = {doiTuong}, @MaTaiKhoan = {maTaiKhoan}");
+            }
+        }
+        finally
+        {
+            if (!wasOpen && conn.State == System.Data.ConnectionState.Open)
+                await conn.CloseAsync();
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<List<BodyStatusHistoryDto>> LayLichSuTrangThaiAsync(long maHoSoThiThe)
+    {
+        var prefix1 = $"HoSoThiThe#{maHoSoThiThe}";
+        var prefix2 = $"HoSoThiThe#{maHoSoThiThe} ";
+        var prefix3 = $"HoSoThiThe#{maHoSoThiThe}:";
+
+        var logs = await db.Set<AuditLog>()
+            .AsNoTracking()
+            .Include(x => x.TaiKhoan)
+            .Where(x => x.DoiTuongTacDong != null &&
+                        (x.DoiTuongTacDong == prefix1 ||
+                         x.DoiTuongTacDong.StartsWith(prefix2) ||
+                         x.DoiTuongTacDong.StartsWith(prefix3)))
+            .OrderByDescending(x => x.ThoiGian)
+            .ThenByDescending(x => x.MaNhatKy)
+            .ToListAsync();
+
+        var result = new List<BodyStatusHistoryDto>(logs.Count);
+        foreach (var log in logs)
+        {
+            var detail = log.DoiTuongTacDong ?? string.Empty;
+            string? oldStatus = null;
+            string? newStatus = null;
+            string? reason = null;
+
+            var match = StatusArrowRegex.Match(detail);
+            if (match.Success)
+            {
+                oldStatus = match.Groups[1].Value;
+                newStatus = match.Groups[2].Value;
+                var colonIdx = detail.IndexOf(':', match.Index + match.Length);
+                if (colonIdx >= 0 && colonIdx + 1 < detail.Length)
+                    reason = detail[(colonIdx + 1)..].Trim();
+            }
+            else if (log.HanhDong == "MO_LAI_HO_SO")
+            {
+                oldStatus = Body.StatusDongHoSo;
+                newStatus = Body.StatusTiepTucLuuGiu;
+                var colonIdx = detail.IndexOf(':');
+                if (colonIdx >= 0 && colonIdx + 1 < detail.Length)
+                    reason = detail[(colonIdx + 1)..].Trim();
+            }
+            else if (log.HanhDong == "INSERT")
+            {
+                newStatus = Body.StatusMoiTiepNhan;
+                reason = "Khởi tạo hồ sơ thi thể mới";
+            }
+
+            result.Add(new BodyStatusHistoryDto
+            {
+                MaNhatKy       = log.MaNhatKy,
+                MaHoSoThiThe   = maHoSoThiThe,
+                HanhDong       = log.HanhDong,
+                TrangThaiCu    = oldStatus,
+                TrangThaiMoi   = newStatus,
+                LyDo           = reason,
+                ChiTiet        = detail,
+                ThoiGian       = log.ThoiGian,
+                MaTaiKhoan     = log.MaTaiKhoan,
+                NguoiThucHien  = log.TaiKhoan != null
+                    ? $"{log.TaiKhoan.HoTen} ({log.TaiKhoan.TenDangNhap})"
+                    : (log.MaTaiKhoan.HasValue ? $"Tài khoản #{log.MaTaiKhoan}" : "Hệ thống")
+            });
+        }
+
+        return result;
+    }
+
+    private static string NhatKyAction(string trangThaiMoi) => trangThaiMoi switch
+    {
+        Body.StatusDongHoSo => "DONG_HO_SO",
+        Body.StatusTiepTucLuuGiu => "MO_LAI_HO_SO",
+        _ => "CHUYEN_TRANG_THAI"
+    };
+
+    private static string Cut255(string s) => s.Length <= 255 ? s : s[..255];
 }

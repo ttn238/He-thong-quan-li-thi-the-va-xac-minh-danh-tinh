@@ -37,6 +37,7 @@ public class FrmTiepNhanTinBao : Form
         public long Size { get; } = size;
         public string TrangThai { get; set; } = "Chờ gửi";
         public long? MaHinhAnh { get; set; }
+        public string? AiRequestId { get; set; }
     }
 
     private sealed class LoaiTinBaoItem { public int Ma { get; set; } public string Ten { get; set; } = ""; }
@@ -315,14 +316,24 @@ public class FrmTiepNhanTinBao : Form
 
     private static Bitmap TaoThumb(string path)
     {
-        using var fs = File.OpenRead(path);
-        using var goc = System.Drawing.Image.FromStream(fs);
         var thumb = new Bitmap(40, 40);
         using var g = Graphics.FromImage(thumb);
         g.Clear(Color.White);
-        float tl = Math.Min(40f / goc.Width, 40f / goc.Height);
-        int w = (int)(goc.Width * tl), h = (int)(goc.Height * tl);
-        g.DrawImage(goc, (40 - w) / 2, (40 - h) / 2, w, h);
+        try
+        {
+            using var fs = File.OpenRead(path);
+            using var goc = System.Drawing.Image.FromStream(fs);
+            float tl = Math.Min(40f / goc.Width, 40f / goc.Height);
+            int w = (int)(goc.Width * tl), h = (int)(goc.Height * tl);
+            g.DrawImage(goc, (40 - w) / 2, (40 - h) / 2, w, h);
+        }
+        catch
+        {
+            g.Clear(UITheme.Navy);
+            using var f = UITheme.FontBold(7);
+            var ext = Path.GetExtension(path).TrimStart('.').ToUpperInvariant();
+            g.DrawString(string.IsNullOrEmpty(ext) ? "IMG" : ext, f, Brushes.White, new PointF(4, 13));
+        }
         return thumb;
     }
 
@@ -357,9 +368,22 @@ public class FrmTiepNhanTinBao : Form
         btnMoKetQuaAi.Enabled = coChon;
         if (!coChon) return;
         var a = (AnhChon)lvAnh.SelectedItems[0].Tag!;
-        using var fs = File.OpenRead(a.DuongDan);
-        using var goc = System.Drawing.Image.FromStream(fs);
-        var bmp = new Bitmap(goc);
+        Bitmap bmp;
+        try
+        {
+            using var fs = File.OpenRead(a.DuongDan);
+            using var goc = System.Drawing.Image.FromStream(fs);
+            bmp = new Bitmap(goc);
+        }
+        catch
+        {
+            bmp = new Bitmap(360, 240);
+            using var g = Graphics.FromImage(bmp);
+            g.Clear(Color.FromArgb(40, 44, 52));
+            using var f = UITheme.FontBold(10);
+            using var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+            g.DrawString($"Tệp ảnh hợp lệ ({Path.GetExtension(a.Ten).ToUpperInvariant()})\n{a.Ten}\n\n(Bấm Phân tích AI để xử lý)", f, Brushes.LightGray, new RectangleF(10, 10, 340, 220), sf);
+        }
         picHienTruong.Image?.Dispose();
         picHienTruong.Image = bmp;
     }
@@ -381,6 +405,7 @@ public class FrmTiepNhanTinBao : Form
         {
             var res = await AiResultClient.AnalyzeAsync(a.DuongDan, _maTinBao?.ToString());
             _ketQuaAiHienTai = res;
+            a.AiRequestId = res.RequestId;
             var soObj = res.Objects?.Count ?? 0;
             var soOcr = res.Ocr?.Count ?? 0;
             lblAiTrangThai.ForeColor = UITheme.Green;
@@ -438,7 +463,9 @@ public class FrmTiepNhanTinBao : Form
     {
         if (lvAnh.SelectedItems.Count == 0) return;
         var a = (AnhChon)lvAnh.SelectedItems[0].Tag!;
-        using var f = new FrmKetQuaAI(a.DuongDan, _maTinBao?.ToString());
+        using var f = !string.IsNullOrWhiteSpace(a.AiRequestId)
+            ? new FrmKetQuaAI(a.AiRequestId)
+            : new FrmKetQuaAI(a.DuongDan, _maTinBao?.ToString());
         f.LocationApplied += loc =>
         {
             if (!string.IsNullOrWhiteSpace(loc.Name))

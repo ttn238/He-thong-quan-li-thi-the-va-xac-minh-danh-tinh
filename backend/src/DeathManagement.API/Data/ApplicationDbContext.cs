@@ -14,6 +14,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Image> Images => Set<Image>();
     public DbSet<Body> Bodies => Set<Body>();
     public DbSet<StorageLocation> StorageLocations => Set<StorageLocation>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {

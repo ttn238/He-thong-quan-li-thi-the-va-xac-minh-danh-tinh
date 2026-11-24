@@ -7,7 +7,7 @@ using DeathManagement.API.Services.Interfaces;
 namespace DeathManagement.API.Services;
 
 /// <summary>
-/// Service nghiệp vụ quản lý hồ sơ thi thể (Task 6.1 — EPIC 6).
+/// Service nghiệp vụ quản lý hồ sơ thi thể và điều phối chuyển đổi trạng thái (Task 6.1 — EPIC 6).
 /// Mọi phương thức đều kiểm tra quyền qua AccessControl trước khi thao tác dữ liệu.
 /// </summary>
 public class BodyService(IBodyRepository repo) : IBodyService
@@ -62,11 +62,26 @@ public class BodyService(IBodyRepository repo) : IBodyService
     {
         AccessControl.Require(ResBody, ActView);
 
+        var restricted = IsRestrictedScope();
+        var dto = await repo.LayChiTietDtoAsync(maHoSoThiThe, restricted);
+        if (dto != null) return dto;
+
         var body = await repo.LayTheoMaAsync(maHoSoThiThe);
-        if (body != null && (AccessControl.RoleCode == "NHA_XAC" || AccessControl.ScopeOf(ResBody, ActView) == "PARTIAL"))
-            return new BodyDto { MaHoSoThiThe = body.MaHoSoThiThe, TrangThai = body.TrangThai,
-                ThoiGianPhatHien = body.ThoiGianPhatHien, GioiTinh = body.GioiTinh, TuoiUocLuong = body.TuoiUocLuong };
-        return body == null ? null : MapToDto(body);
+        if (body == null) return null;
+
+        if (restricted)
+        {
+            return new BodyDto
+            {
+                MaHoSoThiThe     = body.MaHoSoThiThe,
+                TrangThai        = body.TrangThai,
+                ThoiGianPhatHien = body.ThoiGianPhatHien,
+                GioiTinh         = body.GioiTinh,
+                TuoiUocLuong     = body.TuoiUocLuong
+            };
+        }
+
+        return MapToDto(body);
     }
 
     // ──────────────────────── Lấy danh sách ──────────────────────────
@@ -86,14 +101,13 @@ public class BodyService(IBodyRepository repo) : IBodyService
             (long)(filter.Trang - 1) * filter.SoLuong > int.MaxValue)
             throw new ArgumentException("Trang phải từ 1 và số lượng từ 1 đến 100.");
         ValidateGioiTinh(filter.GioiTinh);
-        if (filter.TrangThai != null && !new[] { "MoiTiepNhan", "DangLuuGiu", "DangXacMinh", "DaXacDinh", "DaBanGiao", "DongHoSo", "TiepTucLuuGiu" }.Contains(filter.TrangThai))
+        if (!string.IsNullOrWhiteSpace(filter.TrangThai) && !Body.IsValidStatus(filter.TrangThai))
             throw new ArgumentException("Trạng thái hồ sơ không hợp lệ.");
         if (filter.TuNgay > filter.DenNgay)
             throw new ArgumentException("Thời gian bắt đầu phải trước thời gian kết thúc.");
         if (filter.TuKhoa?.Length > 255)
             throw new ArgumentException("Từ khóa tối đa 255 ký tự.");
-        return await repo.LayDanhSachAsync(filter,
-            AccessControl.RoleCode == "NHA_XAC" || AccessControl.ScopeOf(ResBody, ActView) == "PARTIAL");
+        return await repo.LayDanhSachAsync(filter, IsRestrictedScope());
     }
 
     // ────────────────────────── Cập nhật ─────────────────────────────
@@ -106,14 +120,29 @@ public class BodyService(IBodyRepository repo) : IBodyService
         if (request.ThoiGianPhatHien.HasValue && request.ThoiGianPhatHien.Value > DateTime.Now)
             throw new ArgumentException("Thời gian phát hiện không được ở tương lai.");
 
+        if (request.DiaDiem != null && request.DiaDiem.Trim().Length > 255)
+            throw new ArgumentException("Địa điểm phát hiện không được vượt quá 255 ký tự.");
+
         if (request.GioiTinh != null)
             ValidateGioiTinh(request.GioiTinh);
 
-        if (request.ChieuCao.HasValue && request.ChieuCao.Value <= 0)
-            throw new ArgumentException("Chiều cao phải lớn hơn 0.");
+        if (request.ChieuCao.HasValue && (request.ChieuCao.Value <= 0 || request.ChieuCao.Value > 300))
+            throw new ArgumentException("Chiều cao phải lớn hơn 0 và không vượt quá 300 cm.");
 
         if (request.TuoiUocLuong.HasValue && (request.TuoiUocLuong < 0 || request.TuoiUocLuong > 130))
             throw new ArgumentException("Tuổi ước lượng phải từ 0 đến 130.");
+
+        if (!string.IsNullOrWhiteSpace(request.TrangThai))
+        {
+            ValidateStatusAndRolePermission(request.TrangThai.Trim());
+        }
+
+        // Nhân viên nhà xác (PARTIAL) không được sửa các trường thông tin điều tra nhạy cảm
+        if (IsRestrictedUpdateScope() && (request.DiaDiem != null || request.DacDiemCoThe != null || request.ThoiGianPhatHien.HasValue))
+        {
+            throw AccessControl.NoPermission(AccessControl.Principal, ResBody, ActUpdate,
+                "Nhân viên nhà xác chỉ được phép cập nhật trạng thái lưu giữ, không được sửa địa điểm hoặc đặc điểm nhận dạng.");
+        }
 
         var maTaiKhoan = AccessControl.UserId
             ?? throw AccessControl.NotLoggedIn(ResBody, ActUpdate);
@@ -121,7 +150,83 @@ public class BodyService(IBodyRepository repo) : IBodyService
         await repo.CapNhatAsync(maHoSoThiThe, request, maTaiKhoan);
     }
 
+    // ───────────────────── Chuyển trạng thái hồ sơ ─────────────────────
+
+    /// <inheritdoc />
+    public async Task<BodyDto> ChuyenTrangThaiAsync(long maHoSoThiThe, string trangThaiMoi, string? lyDo = null)
+    {
+        AccessControl.Require(ResBody, ActUpdate);
+
+        if (string.IsNullOrWhiteSpace(trangThaiMoi))
+            throw new ArgumentException("Vui lòng chọn trạng thái mới cho hồ sơ.");
+
+        var dich = trangThaiMoi.Trim();
+        ValidateStatusAndRolePermission(dich);
+
+        var maTaiKhoan = AccessControl.UserId
+            ?? throw AccessControl.NotLoggedIn(ResBody, ActUpdate);
+
+        var current = await repo.LayTheoMaAsync(maHoSoThiThe)
+            ?? throw new KeyNotFoundException($"Không tìm thấy hồ sơ thi thể #{maHoSoThiThe}.");
+
+        if (current.TrangThai == dich)
+            throw new InvalidOperationException($"Hồ sơ #{maHoSoThiThe} đang ở trạng thái '{Body.GetStatusLabel(dich)}'.");
+
+        if (!Body.CanTransition(current.TrangThai, dich))
+        {
+            var nextAllowed = Body.GetAllowedNextStatuses(current.TrangThai);
+            var nextDisplay = nextAllowed.Count > 0
+                ? string.Join(", ", nextAllowed.Select(s => $"{Body.GetStatusLabel(s)} ({s})"))
+                : "Không có";
+            throw new InvalidOperationException(
+                $"Chuyển trạng thái không hợp lệ: Không thể chuyển từ '{Body.GetStatusLabel(current.TrangThai)}' ({current.TrangThai}) sang '{Body.GetStatusLabel(dich)}' ({dich}). Trạng thái hợp lệ tiếp theo: {nextDisplay}.");
+        }
+
+        if (current.TrangThai == Body.StatusDongHoSo && dich == Body.StatusTiepTucLuuGiu && string.IsNullOrWhiteSpace(lyDo))
+            throw new ArgumentException("Mở lại hồ sơ đã đóng bắt buộc phải nhập lý do.");
+
+        await repo.ChuyenTrangThaiAsync(maHoSoThiThe, dich, lyDo, maTaiKhoan);
+
+        return await LayChiTietAsync(maHoSoThiThe)
+               ?? MapToDto(new Body { MaHoSoThiThe = maHoSoThiThe, TrangThai = dich, ThoiGianPhatHien = current.ThoiGianPhatHien });
+    }
+
+    // ───────────────────── Lịch sử trạng thái hồ sơ ─────────────────────
+
+    /// <inheritdoc />
+    public async Task<List<BodyStatusHistoryDto>> LayLichSuTrangThaiAsync(long maHoSoThiThe)
+    {
+        AccessControl.Require(ResBody, ActView);
+
+        _ = await repo.LayTheoMaAsync(maHoSoThiThe)
+            ?? throw new KeyNotFoundException($"Không tìm thấy hồ sơ thi thể #{maHoSoThiThe}.");
+
+        return await repo.LayLichSuTrangThaiAsync(maHoSoThiThe);
+    }
+
     // ─────────────────────── Phương thức tiện ích ────────────────────
+
+    private static bool IsRestrictedScope()
+        => AccessControl.RoleCode == AuthorizationPolicies.RoleMorgue
+           || AccessControl.ScopeOf(ResBody, ActView) == AuthorizationPolicies.ScopePartial;
+
+    private static bool IsRestrictedUpdateScope()
+        => AccessControl.RoleCode == AuthorizationPolicies.RoleMorgue
+           || AccessControl.ScopeOf(ResBody, ActUpdate) == AuthorizationPolicies.ScopePartial;
+
+    private static void ValidateStatusAndRolePermission(string status)
+    {
+        if (!Body.IsValidStatus(status))
+            throw new ArgumentException(
+                $"Trạng thái hồ sơ '{status}' không hợp lệ. Các giá trị hợp lệ: {string.Join(", ", Body.ValidStatuses)}.");
+
+        // Nếu vai trò NHA_XAC (phạm vi PARTIAL): chỉ được chuyển sang các trạng thái liên quan đến lưu giữ hoặc bàn giao tại nhà xác
+        if (IsRestrictedUpdateScope() && status is Body.StatusDaXacDinh or Body.StatusDongHoSo)
+        {
+            throw AccessControl.NoPermission(AccessControl.Principal, ResBody, ActUpdate,
+                $"Vai trò Nhân viên nhà xác không được phép chốt trạng thái '{Body.GetStatusLabel(status)}'. Thao tác này thuộc thẩm quyền Cán bộ xác minh.");
+        }
+    }
 
     private static void ValidateGioiTinh(string? gioiTinh)
     {
@@ -133,14 +238,14 @@ public class BodyService(IBodyRepository repo) : IBodyService
 
     private static BodyDto MapToDto(Body b) => new()
     {
-        MaHoSoThiThe    = b.MaHoSoThiThe,
+        MaHoSoThiThe     = b.MaHoSoThiThe,
         ThoiGianPhatHien = b.ThoiGianPhatHien,
-        DiaDiem         = b.DiaDiem,
-        TrangThai       = b.TrangThai,
-        GioiTinh        = b.GioiTinh,
-        TuoiUocLuong    = b.TuoiUocLuong,
-        ChieuCao        = b.ChieuCao,
-        DacDiemCoThe    = b.DacDiemCoThe,
-        MaTinBao        = b.MaTinBao
+        DiaDiem          = b.DiaDiem,
+        TrangThai        = b.TrangThai,
+        GioiTinh         = b.GioiTinh,
+        TuoiUocLuong     = b.TuoiUocLuong,
+        ChieuCao         = b.ChieuCao,
+        DacDiemCoThe     = b.DacDiemCoThe,
+        MaTinBao         = b.MaTinBao
     };
 }

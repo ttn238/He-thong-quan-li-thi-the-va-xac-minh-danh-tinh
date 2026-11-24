@@ -222,14 +222,4 @@ public class UserService : IUserService
             NgayCapNhat = user.NgayCapNhat
         };
     }
-
-    // GetPagedListAsync:           AccessControl.Require(ResourceAccount, ActionView);
-    // GetByIdAsync(long id):       AccessControl.RequireSelfOr(id, ResourceAccount, ActionView);   // xem hồ sơ của chính mình thì được
-    // GetByUsernameAsync:          AccessControl.Require(ResourceAccount, ActionView);
-    // CreateAsync:                 AccessControl.Require(ResourceAccount, ActionCreate);
-    // UpdateAsync(long id, ...):   AccessControl.Require(ResourceAccount, ActionUpdate);
-    // UpdateProfileAsync:          AccessControl.RequireSelfOr(currentUserId, ResourceAccount, ActionUpdate);
-    // ChangeStatusAsync:           AccessControl.Require(ResourceAccount, ActionUpdate);
-    // ResetPasswordAsync:          AccessControl.Require(ResourceAccount, ActionUpdate);
-    // DeleteAsync:                 AccessControl.Require(ResourceAccount, ActionUpdate);
 }
