@@ -188,7 +188,7 @@ CREATE TABLE HoSoThiThe
     ThoiGianPhatHien DATETIME2 NOT NULL,
     DiaDiem NVARCHAR(255),
     TrangThai NVARCHAR(30) NOT NULL DEFAULT N'MoiTiepNhan',
-    GioiTinh NVARCHAR(10),
+    GioiTinh NVARCHAR(20),
     TuoiUocLuong SMALLINT,
     ChieuCao DECIMAL(5,2),                -- don vi: cm
     DacDiemCoThe NVARCHAR(MAX),

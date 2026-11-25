@@ -19,12 +19,25 @@ public class BodyListTests
     private class Repository : IBodyRepository
     {
         public bool Restricted;
+        public CreateBodyRequest? LastCreated;
         public Task<(List<BodyDto> Items, int Total)> LayDanhSachAsync(BodyFilterRequest f, bool nhaXac)
         { Restricted = nhaXac; return Task.FromResult((new List<BodyDto>(), 0)); }
         public Task<(List<BodyDto> Items, int Total)> LayDanhSachAsync(string? k, string? s, int p, int n) => throw new NotSupportedException();
         public Task<Body?> LayTheoMaAsync(long id) => Task.FromResult<Body?>(new Body { MaHoSoThiThe = id, DiaDiem = "secret", DacDiemCoThe = "secret", ChieuCao = 170 });
-        public Task<long> TaoHoSoAsync(CreateBodyRequest r, long id) => throw new NotSupportedException();
+        public Task<BodyDto?> LayChiTietDtoAsync(long maHoSoThiThe, bool nhaXac) => Task.FromResult<BodyDto?>(null);
+        public Task<long> TaoHoSoAsync(CreateBodyRequest r, long id) { LastCreated = r; return Task.FromResult(1L); }
         public Task CapNhatAsync(long id, UpdateBodyRequest r, long user) => throw new NotSupportedException();
+        public Task ChuyenTrangThaiAsync(long maHoSoThiThe, string trangThaiMoi, string? lyDo, long maTaiKhoan) => throw new NotSupportedException();
+        public Task<List<BodyStatusHistoryDto>> LayLichSuTrangThaiAsync(long maHoSoThiThe) => Task.FromResult(new List<BodyStatusHistoryDto>());
+    }
+
+    private static IEnumerable<T> FindControls<T>(System.Windows.Forms.Control root) where T : System.Windows.Forms.Control
+    {
+        foreach (System.Windows.Forms.Control c in root.Controls)
+        {
+            if (c is T match) yield return match;
+            foreach (var nested in FindControls<T>(c)) yield return nested;
+        }
     }
 
     [Theory]
@@ -40,13 +53,13 @@ public class BodyListTests
         {
             var repo = new Repository();
             var service = new BodyService(repo);
-            await service.LayDanhSachAsync(new BodyFilterRequest());
+            await service.LayDanhSachAsync(new BodyFilterRequest { GioiTinh = "" });
             Assert.Equal(restricted, repo.Restricted);
             using var form = new DeathManagement.API.Forms.FrmQuanLyThiThe();
-            var grid = Assert.Single(form.Controls.OfType<System.Windows.Forms.DataGridView>());
+            var grid = Assert.Single(FindControls<System.Windows.Forms.DataGridView>(form));
             Assert.Equal(!restricted, grid.Columns.Contains(nameof(BodyDto.DiaDiem)));
             Assert.Equal(!restricted, grid.Columns.Contains(nameof(BodyDto.DacDiemCoThe)));
-            Assert.Equal(restricted, grid.Columns.Contains(nameof(BodyDto.Khu)));
+            Assert.True(grid.Columns.Contains(nameof(BodyDto.ViTriLuuTruHienThi)));
             await Assert.ThrowsAsync<ArgumentException>(() => service.LayDanhSachAsync(new BodyFilterRequest { Trang = 0 }));
             await Assert.ThrowsAsync<ArgumentException>(() => service.LayDanhSachAsync(new BodyFilterRequest { TuNgay = DateTime.Today, DenNgay = DateTime.Today.AddDays(-1) }));
             if (restricted)
@@ -56,6 +69,45 @@ public class BodyListTests
                 Assert.Null(detail.DacDiemCoThe);
                 Assert.Null(detail.ChieuCao);
             }
+        }
+        finally { AccessControl.PrincipalProvider = previous; }
+    }
+
+    [Fact]
+    public async Task CreateBodyNormalizesGenderAndRejectsInvalidInputs()
+    {
+        var previous = AccessControl.PrincipalProvider;
+        AccessControl.PrincipalProvider = () => new ClaimsPrincipal(new ClaimsIdentity(
+            new[] { new Claim("sub", "2"), new Claim("role", "CONG_AN"), new Claim("perm", "BODY:CREATE:ALL") }, "test"));
+        try
+        {
+            var repo = new Repository();
+            var service = new BodyService(repo);
+
+            var id = await service.TaoHoSoAsync(new CreateBodyRequest
+            {
+                ThoiGianPhatHien = DateTime.Now.AddHours(-1),
+                DiaDiem = "  Quận 1, TP.HCM  ",
+                GioiTinh = "  "
+            });
+
+            Assert.Equal(1L, id);
+            Assert.Equal("KhongXacDinh", repo.LastCreated!.GioiTinh);
+            Assert.Equal("Quận 1, TP.HCM", repo.LastCreated.DiaDiem);
+
+            await Assert.ThrowsAsync<ArgumentException>(() => service.TaoHoSoAsync(new CreateBodyRequest
+            {
+                ThoiGianPhatHien = DateTime.Now.AddHours(2),
+                DiaDiem = "Hà Nội",
+                GioiTinh = "KhongXacDinh"
+            }));
+
+            await Assert.ThrowsAsync<ArgumentException>(() => service.TaoHoSoAsync(new CreateBodyRequest
+            {
+                ThoiGianPhatHien = DateTime.Now.AddHours(-1),
+                DiaDiem = "Hà Nội",
+                GioiTinh = "Invalid"
+            }));
         }
         finally { AccessControl.PrincipalProvider = previous; }
     }

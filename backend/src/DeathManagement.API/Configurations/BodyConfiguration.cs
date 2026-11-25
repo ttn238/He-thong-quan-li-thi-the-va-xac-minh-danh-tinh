@@ -18,7 +18,7 @@ public class BodyConfiguration : IEntityTypeConfiguration<Body>
         b.Property(x => x.DiaDiem).HasMaxLength(255);
         b.Property(x => x.TrangThai).HasMaxLength(30).IsRequired()
             .HasDefaultValue(Body.StatusMoiTiepNhan);
-        b.Property(x => x.GioiTinh).HasMaxLength(10);
+        b.Property(x => x.GioiTinh).HasMaxLength(20);
         b.Property(x => x.ChieuCao).HasPrecision(5, 2);
         b.Property(x => x.DacDiemCoThe).HasColumnType("nvarchar(max)");
         b.Property(x => x.KhuonMat).HasColumnType("varbinary(max)");

@@ -131,7 +131,7 @@ BEGIN
        OR NOT EXISTS (SELECT 1 FROM HoSoNguoiMatTich WHERE MaHoSoMatTich = @MaHoSoMatTich)
         RETURN NULL;
 
-    DECLARE @gtT NVARCHAR(10), @tuoiT SMALLINT, @gtM NVARCHAR(10), @ns DATE, @tg DATETIME2;
+    DECLARE @gtT NVARCHAR(20), @tuoiT SMALLINT, @gtM NVARCHAR(10), @ns DATE, @tg DATETIME2;
     DECLARE @num DECIMAL(18,4) = 0, @den DECIMAL(18,4) = 0, @s DECIMAL(10,2), @tuoiM INT, @d INT;
 
     SELECT @gtT = GioiTinh, @tuoiT = TuoiUocLuong FROM HoSoThiThe WHERE MaHoSoThiThe = @MaHoSoThiThe;

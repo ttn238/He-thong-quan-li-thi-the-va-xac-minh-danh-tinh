@@ -42,11 +42,10 @@ public class BodyService(IBodyRepository repo) : IBodyService
         if (request.ChieuCao is <= 0 or > 300)
             throw new ArgumentException("Chiều cao phải lớn hơn 0 và không vượt quá 300 cm.");
 
-        ValidateGioiTinh(request.GioiTinh);
-
-        // 3. Chuẩn hóa
+        // 3. Chuẩn hóa & kiểm tra giới tính
         request.GioiTinh = string.IsNullOrWhiteSpace(request.GioiTinh) ? "KhongXacDinh" : request.GioiTinh.Trim();
         request.DiaDiem  = request.DiaDiem.Trim();
+        ValidateGioiTinh(request.GioiTinh);
 
         // 4. Gọi repository → sp_LapHoSoThiThe
         var maTaiKhoan = AccessControl.UserId
@@ -124,7 +123,10 @@ public class BodyService(IBodyRepository repo) : IBodyService
             throw new ArgumentException("Địa điểm phát hiện không được vượt quá 255 ký tự.");
 
         if (request.GioiTinh != null)
+        {
+            request.GioiTinh = string.IsNullOrWhiteSpace(request.GioiTinh) ? "KhongXacDinh" : request.GioiTinh.Trim();
             ValidateGioiTinh(request.GioiTinh);
+        }
 
         if (request.ChieuCao.HasValue && (request.ChieuCao.Value <= 0 || request.ChieuCao.Value > 300))
             throw new ArgumentException("Chiều cao phải lớn hơn 0 và không vượt quá 300 cm.");
@@ -230,9 +232,9 @@ public class BodyService(IBodyRepository repo) : IBodyService
 
     private static void ValidateGioiTinh(string? gioiTinh)
     {
-        if (gioiTinh == null) return;
+        if (string.IsNullOrWhiteSpace(gioiTinh)) return;
         var valid = new[] { "Nam", "Nu", "Khac", "KhongXacDinh" };
-        if (!valid.Contains(gioiTinh))
+        if (!valid.Contains(gioiTinh.Trim()))
             throw new ArgumentException($"Giới tính không hợp lệ. Các giá trị được chấp nhận: {string.Join(", ", valid)}.");
     }
 
