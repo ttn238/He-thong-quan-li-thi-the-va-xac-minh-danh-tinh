@@ -14,8 +14,20 @@ public interface IBodyRepository
     /// <summary>Lấy hồ sơ theo mã.</summary>
     Task<Body?> LayTheoMaAsync(long maHoSoThiThe);
 
-    /// <summary>Lấy chi tiết đầy đủ (kèm thông tin vị trí lưu trữ hiện tại).</summary>
+    /// <summary>Lấy chi tiết cơ bản (kèm thông tin vị trí lưu trữ hiện tại).</summary>
     Task<BodyDto?> LayChiTietDtoAsync(long maHoSoThiThe, bool nhaXac);
+
+    /// <summary>
+    /// Tổng hợp đầy đủ chi tiết hồ sơ thi thể (Task 6.3):
+    /// HoSoThiThe + TinBao + v_ViTriHienTai/ViTriLuuTru/LichSuLuuTru + DoVatCaNhan + sp_LayHinhAnhTheoHoSo + v_DoiSanhChiTiet + NhatKyHeThong.
+    /// </summary>
+    Task<BodyDetailDto?> LayChiTietDayDuAsync(
+        long maHoSoThiThe,
+        long maTaiKhoan,
+        bool nhaXac,
+        bool coQuyenXemDoVat,
+        bool coQuyenXemHinhAnh,
+        bool coQuyenXemDoiSanh);
 
     /// <summary>Lấy danh sách có phân trang, lọc theo từ khóa và trạng thái.</summary>
     Task<(List<BodyDto> Items, int Total)> LayDanhSachAsync(string? tuKhoa, string? trangThai, int trang, int soLuong);

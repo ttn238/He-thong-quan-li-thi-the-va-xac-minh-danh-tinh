@@ -46,12 +46,14 @@ public class BodyController(IBodyService service) : ControllerBase
     }
 
     /// <summary>
-    /// Lấy chi tiết một hồ sơ thi thể theo mã định danh (Yêu cầu quyền BODY:VIEW).
+    /// Lấy chi tiết đầy đủ một hồ sơ thi thể theo mã định danh (Task 6.3 — Yêu cầu quyền BODY:VIEW).
+    /// Bao gồm thông tin cơ bản, tin báo gốc, vị trí lưu trữ, đồ vật cá nhân, hình ảnh, đối sánh và lịch sử trạng thái.
     /// </summary>
     [HttpGet("{id:long}")]
+    [HttpGet("{id:long}/detail")]
     public async Task<IActionResult> GetById(long id)
     {
-        var body = await service.LayChiTietAsync(id);
+        var body = await service.GetByIdAsync(id);
         if (body == null)
             return NotFound(new { message = $"Không tìm thấy hồ sơ thi thể #{id}." });
 

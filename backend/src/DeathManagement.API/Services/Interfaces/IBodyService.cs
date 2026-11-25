@@ -10,8 +10,15 @@ public interface IBodyService
     /// <summary>Tạo hồ sơ thi thể mới. Yêu cầu quyền BODY:CREATE.</summary>
     Task<long> TaoHoSoAsync(CreateBodyRequest request);
 
-    /// <summary>Lấy chi tiết hồ sơ theo mã. Yêu cầu quyền BODY:VIEW.</summary>
+    /// <summary>Lấy chi tiết cơ bản hồ sơ theo mã. Yêu cầu quyền BODY:VIEW.</summary>
     Task<BodyDto?> LayChiTietAsync(long maHoSoThiThe);
+
+    /// <summary>
+    /// Lấy đầy đủ chi tiết hồ sơ thi thể (Task 6.3): Thông tin cơ bản + Tin báo gốc + Vị trí lưu trữ +
+    /// Đồ vật cá nhân + Hình ảnh (sp_LayHinhAnhTheoHoSo) + Kết quả đối sánh + Lịch sử trạng thái.
+    /// Yêu cầu quyền BODY:VIEW.
+    /// </summary>
+    Task<BodyDetailDto?> GetByIdAsync(long maHoSoThiThe);
 
     /// <summary>Lấy danh sách hồ sơ có phân trang. Yêu cầu quyền BODY:VIEW.</summary>
     Task<(List<BodyDto> Items, int Total)> LayDanhSachAsync(string? tuKhoa, string? trangThai, int trang = 1, int soLuong = 20);

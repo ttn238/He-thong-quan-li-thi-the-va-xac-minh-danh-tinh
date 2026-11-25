@@ -83,6 +83,59 @@ public class BodyService(IBodyRepository repo) : IBodyService
         return MapToDto(body);
     }
 
+    /// <inheritdoc />
+    public async Task<BodyDetailDto?> GetByIdAsync(long maHoSoThiThe)
+    {
+        AccessControl.Require(ResBody, ActView);
+        if (AccessControl.ScopeOf(ResBody, ActView) is not (AuthorizationPolicies.ScopeAll or AuthorizationPolicies.ScopePartial))
+            throw new ForbiddenException("Phạm vi quyền chưa hỗ trợ xem chi tiết hồ sơ thi thể.");
+
+        var maTaiKhoan = AccessControl.UserId
+            ?? throw AccessControl.NotLoggedIn(ResBody, ActView);
+
+        var restricted = IsRestrictedScope();
+        var coQuyenXemDoVat = !restricted || AccessControl.Can(AuthorizationPolicies.ResourceObject, ActView);
+        var coQuyenXemHinhAnh = AccessControl.Can(AuthorizationPolicies.ResourceFile, ActView);
+        var coQuyenXemDoiSanh = !restricted && AccessControl.Can(AuthorizationPolicies.ResourceMatching, ActView);
+
+        var detail = await repo.LayChiTietDayDuAsync(
+            maHoSoThiThe,
+            maTaiKhoan,
+            restricted,
+            coQuyenXemDoVat,
+            coQuyenXemHinhAnh,
+            coQuyenXemDoiSanh);
+
+        if (detail == null)
+            return null;
+
+        // Phòng thủ nhiều lớp ở tầng Service để đảm bảo không rò rỉ dữ liệu nhạy cảm cho NHA_XAC / thiếu quyền
+        detail.CheDoHanCheNhaXac = restricted;
+        detail.CoQuyenXemDoVat   = coQuyenXemDoVat;
+        detail.CoQuyenXemHinhAnh = coQuyenXemHinhAnh;
+        detail.CoQuyenXemDoiSanh = coQuyenXemDoiSanh;
+
+        if (restricted)
+        {
+            detail.DiaDiem      = null;
+            detail.ChieuCao     = null;
+            detail.DacDiemCoThe = null;
+            detail.MaTinBao     = null;
+            detail.TinBao       = null;
+        }
+
+        if (!coQuyenXemDoVat)
+            detail.DoVatCaNhan.Clear();
+
+        if (!coQuyenXemHinhAnh)
+            detail.HinhAnh.Clear();
+
+        if (!coQuyenXemDoiSanh)
+            detail.KetQuaDoiSanh.Clear();
+
+        return detail;
+    }
+
     // ──────────────────────── Lấy danh sách ──────────────────────────
 
     /// <inheritdoc />

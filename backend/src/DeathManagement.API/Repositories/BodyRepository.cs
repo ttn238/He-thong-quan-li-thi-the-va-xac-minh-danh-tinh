@@ -78,6 +78,158 @@ public class BodyRepository(ApplicationDbContext db) : IBodyRepository
     }
 
     /// <inheritdoc />
+    public async Task<BodyDetailDto?> LayChiTietDayDuAsync(
+        long maHoSoThiThe,
+        long maTaiKhoan,
+        bool nhaXac,
+        bool coQuyenXemDoVat,
+        bool coQuyenXemHinhAnh,
+        bool coQuyenXemDoiSanh)
+    {
+        var baseDto = await LayChiTietDtoAsync(maHoSoThiThe, nhaXac);
+        if (baseDto == null)
+            return null;
+
+        var detail = new BodyDetailDto
+        {
+            MaHoSoThiThe       = baseDto.MaHoSoThiThe,
+            ThoiGianPhatHien   = baseDto.ThoiGianPhatHien,
+            DiaDiem            = nhaXac ? null : baseDto.DiaDiem,
+            TrangThai          = baseDto.TrangThai,
+            GioiTinh           = baseDto.GioiTinh,
+            TuoiUocLuong       = baseDto.TuoiUocLuong,
+            ChieuCao           = nhaXac ? null : baseDto.ChieuCao,
+            DacDiemCoThe       = nhaXac ? null : baseDto.DacDiemCoThe,
+            MaTinBao           = nhaXac ? null : baseDto.MaTinBao,
+            MaViTri            = baseDto.MaViTri,
+            Khu                = baseDto.Khu,
+            Tu                 = baseDto.Tu,
+            Ngan               = baseDto.Ngan,
+            CheDoHanCheNhaXac  = nhaXac,
+            CoQuyenXemDoVat    = coQuyenXemDoVat,
+            CoQuyenXemHinhAnh  = coQuyenXemHinhAnh,
+            CoQuyenXemDoiSanh  = coQuyenXemDoiSanh && !nhaXac
+        };
+
+        // 1. Tin báo gốc (ẩn hoàn toàn với vai trò Nhà xác)
+        if (!nhaXac && baseDto.MaTinBao.HasValue)
+        {
+            var maTinBao = baseDto.MaTinBao.Value;
+            detail.TinBao = await db.Database.SqlQuery<BodyIncidentSummaryDto>($"""
+                SELECT tb.MaTinBao, tb.MaTin, ltb.TenLoaiTinBao, tb.TieuDe, tb.NoiDung,
+                       tb.ThoiGianXayRa, tb.DiaDiem, tb.NguonTin, tb.HoTenNguoiBao,
+                       tb.SoDienThoaiNguoiBao, tb.EmailNguoiBao, tb.MucDoUuTien,
+                       tb.TrangThai, tb.GhiChuXuLy, tb.NgayTiepNhan
+                FROM dbo.TinBao tb
+                LEFT JOIN dbo.LoaiTinBao ltb ON ltb.MaLoaiTinBao = tb.MaLoaiTinBao
+                WHERE tb.MaTinBao = {maTinBao}
+                """).FirstOrDefaultAsync();
+        }
+
+        // 2. Vị trí ngăn lạnh hiện tại (v_ViTriHienTai + ViTriLuuTru) & lịch sử lưu trữ (LichSuLuuTru)
+        detail.ViTriHienTai = await db.Database.SqlQuery<BodyStorageCurrentDto>($"""
+            SELECT vt.MaViTri, v.Khu, v.Tu, v.Ngan, v.SucChua, vt.ThoiGianXep
+            FROM dbo.v_ViTriHienTai vt
+            JOIN dbo.ViTriLuuTru v ON v.MaViTri = vt.MaViTri
+            WHERE vt.MaHoSoThiThe = {maHoSoThiThe}
+            """).FirstOrDefaultAsync();
+
+        detail.LichSuLuuTru = await db.Database.SqlQuery<BodyStorageHistoryDto>($"""
+            SELECT ls.MaLichSu, ls.ThoiGian, ls.MaViTri, v.Khu, v.Tu, v.Ngan
+            FROM dbo.LichSuLuuTru ls
+            JOIN dbo.ViTriLuuTru v ON v.MaViTri = ls.MaViTri
+            WHERE ls.MaHoSoThiThe = {maHoSoThiThe}
+            ORDER BY ls.ThoiGian DESC, ls.MaLichSu DESC
+            """).ToListAsync();
+
+        // 3. Danh sách đồ vật cá nhân (DoVatCaNhan + LoaiDoVat)
+        if (coQuyenXemDoVat)
+        {
+            detail.DoVatCaNhan = await db.Database.SqlQuery<BodyPersonalItemDto>($"""
+                SELECT dv.MaDoVat, dv.Ten, dv.MaLoaiDoVat, ldv.TenLoai AS TenLoaiDoVat,
+                       dv.MoTa, dv.TinhTrang
+                FROM dbo.DoVatCaNhan dv
+                JOIN dbo.LoaiDoVat ldv ON ldv.MaLoaiDoVat = dv.MaLoaiDoVat
+                WHERE dv.MaHoSoThiThe = {maHoSoThiThe}
+                ORDER BY dv.MaDoVat ASC
+                """).ToListAsync();
+        }
+
+        // 4. Danh sách hình ảnh gọi trực tiếp thủ tục sp_LayHinhAnhTheoHoSo
+        if (coQuyenXemHinhAnh)
+        {
+            detail.HinhAnh = await LayHinhAnhQuaSpAsync(maTaiKhoan, maHoSoThiThe);
+        }
+
+        // 5. Danh sách kết quả đối sánh từ view v_DoiSanhChiTiet
+        if (coQuyenXemDoiSanh && !nhaXac)
+        {
+            detail.KetQuaDoiSanh = await db.Database.SqlQuery<BodyMatchResultDto>($"""
+                SELECT MaDoiSanh, MaHoSoThiThe, MaHoSoMatTich, HoTenNguoiMatTich,
+                       DiemDoiSanh, MucDoPhuHop, TrangThai, TieuChi,
+                       ThoiGianYeuCau, NguoiYeuCau
+                FROM dbo.v_DoiSanhChiTiet
+                WHERE MaHoSoThiThe = {maHoSoThiThe}
+                ORDER BY DiemDoiSanh DESC, ThoiGianYeuCau DESC
+                """).ToListAsync();
+        }
+
+        // 6. Lịch sử thay đổi trạng thái (NhatKyHeThong)
+        detail.LichSuTrangThai = await LayLichSuTrangThaiAsync(maHoSoThiThe);
+
+        return detail;
+    }
+
+    private async Task<List<BodyImageItemDto>> LayHinhAnhQuaSpAsync(long maTaiKhoan, long maHoSoThiThe)
+    {
+        var items = new List<BodyImageItemDto>();
+        var conn = db.Database.GetDbConnection();
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen) await conn.OpenAsync();
+        try
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "dbo.sp_LayHinhAnhTheoHoSo";
+            cmd.CommandType = System.Data.CommandType.StoredProcedure;
+
+            var pAcc = cmd.CreateParameter();
+            pAcc.ParameterName = "@MaTaiKhoanTruyCap";
+            pAcc.Value = maTaiKhoan;
+            cmd.Parameters.Add(pAcc);
+
+            var pBody = cmd.CreateParameter();
+            pBody.ParameterName = "@MaHoSoThiThe";
+            pBody.Value = maHoSoThiThe;
+            cmd.Parameters.Add(pBody);
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                items.Add(new BodyImageItemDto
+                {
+                    MaHinhAnh      = reader.GetInt64(0),
+                    TenGoc         = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                    DuongDan       = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+                    LoaiHinhAnh    = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+                    DinhDang       = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+                    KichThuoc      = reader.IsDBNull(5) ? 0L : reader.GetInt64(5),
+                    LaNhayCam      = !reader.IsDBNull(6) && reader.GetBoolean(6),
+                    MoTa           = reader.IsDBNull(7) ? null : reader.GetString(7),
+                    ThoiGianTaiLen = reader.IsDBNull(8) ? DateTime.MinValue : reader.GetDateTime(8),
+                    NguoiTaiLen    = reader.IsDBNull(9) ? "Hệ thống" : reader.GetString(9)
+                });
+            }
+        }
+        finally
+        {
+            if (!wasOpen && conn.State == System.Data.ConnectionState.Open)
+                await conn.CloseAsync();
+        }
+
+        return items;
+    }
+
+    /// <inheritdoc />
     public async Task<(List<BodyDto> Items, int Total)> LayDanhSachAsync(
         string? tuKhoa, string? trangThai, int trang, int soLuong)
         => await LayDanhSachAsync(new BodyFilterRequest
