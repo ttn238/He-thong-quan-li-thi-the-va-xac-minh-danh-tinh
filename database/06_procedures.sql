@@ -49,7 +49,7 @@ GO
 -- Lap ho so thi the (co the gan voi tin bao)
 CREATE OR ALTER PROCEDURE sp_LapHoSoThiThe
     @MaTaiKhoan BIGINT, @ThoiGianPhatHien DATETIME2, @DiaDiem NVARCHAR(255),
-    @GioiTinh NVARCHAR(10), @TuoiUocLuong SMALLINT = NULL, @ChieuCao DECIMAL(5,2) = NULL,
+    @GioiTinh NVARCHAR(20), @TuoiUocLuong SMALLINT = NULL, @ChieuCao DECIMAL(5,2) = NULL,
     @DacDiemCoThe NVARCHAR(MAX) = NULL, @MaTinBao INT = NULL,
     @MaHoSoThiThe BIGINT OUTPUT
 AS

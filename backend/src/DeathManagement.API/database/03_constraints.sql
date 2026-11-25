@@ -25,6 +25,11 @@ ALTER TABLE TaiKhoanNguoiDung ADD
 GO
 
 /* 5. Ho so thi the */
+ALTER TABLE HoSoThiThe DROP CONSTRAINT IF EXISTS CK_HoSoThiThe_GioiTinh;
+ALTER TABLE HoSoThiThe ALTER COLUMN GioiTinh NVARCHAR(20) NULL;
+ALTER TABLE HoSoThiThe ADD CONSTRAINT CK_HoSoThiThe_GioiTinh
+    CHECK (GioiTinh IS NULL OR GioiTinh IN (N'Nam', N'Nu', N'Khac', N'KhongXacDinh'));
+GO
 ALTER TABLE HoSoThiThe DROP CONSTRAINT IF EXISTS CK_HoSoThiThe_TrangThai;
 ALTER TABLE HoSoThiThe ADD CONSTRAINT CK_HoSoThiThe_TrangThai
     CHECK (TrangThai IN (N'MoiTiepNhan', N'DangLuuGiu', N'DangXacMinh', N'TiepTucLuuGiu',

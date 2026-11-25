@@ -341,7 +341,7 @@ public sealed class FrmLapHoSoThiThe : Form
         }
         finally
         {
-            btnLap.Enabled = true;
+            btnLap.Enabled = AccessControl.Can("BODY", "CREATE");
         }
     }
 
