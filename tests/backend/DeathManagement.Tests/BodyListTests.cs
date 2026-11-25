@@ -25,6 +25,9 @@ public class BodyListTests
         public Task<Body?> LayTheoMaAsync(long id) => Task.FromResult<Body?>(new Body { MaHoSoThiThe = id, DiaDiem = "secret", DacDiemCoThe = "secret", ChieuCao = 170 });
         public Task<long> TaoHoSoAsync(CreateBodyRequest r, long id) => throw new NotSupportedException();
         public Task CapNhatAsync(long id, UpdateBodyRequest r, long user) => throw new NotSupportedException();
+        public Task<BodyDto?> LayChiTietDtoAsync(long id, bool nhaXac) => Task.FromResult<BodyDto?>(new BodyDto { MaHoSoThiThe = id, DiaDiem = nhaXac ? null : "secret", DacDiemCoThe = nhaXac ? null : "secret", ChieuCao = nhaXac ? null : 170 });
+        public Task ChuyenTrangThaiAsync(long id, string st, string? reason, long user) => Task.CompletedTask;
+        public Task<List<BodyStatusHistoryDto>> LayLichSuTrangThaiAsync(long id) => Task.FromResult(new List<BodyStatusHistoryDto>());
     }
 
     [Theory]

@@ -155,6 +155,7 @@ public class FrmQuanLyThiThe : Form
         if (restricted)
         {
             keyword.PlaceholderText = "Tìm mã hồ sơ";
+            AddColumn(nameof(BodyDto.Khu), "Khu", 60);
         }
         else
         {
@@ -186,10 +187,7 @@ public class FrmQuanLyThiThe : Form
                 await OpenSelectedDetailAsync();
         };
 
-        var pnlGrid = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12), BackColor = UITheme.Bg };
-        pnlGrid.Controls.Add(grid);
-
-        Controls.Add(pnlGrid);
+        Controls.Add(grid);
         Controls.Add(footer);
         Controls.Add(filters);
         Controls.Add(pnlHeader);

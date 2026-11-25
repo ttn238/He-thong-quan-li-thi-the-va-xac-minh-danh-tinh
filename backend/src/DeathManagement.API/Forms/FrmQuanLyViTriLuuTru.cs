@@ -57,6 +57,37 @@ public class FrmQuanLyViTriLuuTru : Form
         Font = UITheme.FontRegular(9.5f)
     };
 
+    private readonly ComboBox cboLocTu = new()
+    {
+        DropDownStyle = ComboBoxStyle.DropDownList,
+        Width = 140,
+        Font = UITheme.FontRegular(9.5f)
+    };
+
+    private readonly FlowLayoutPanel flpZoneCards = new()
+    {
+        Dock = DockStyle.Fill,
+        FlowDirection = FlowDirection.LeftToRight,
+        WrapContents = false,
+        AutoScroll = true,
+        Padding = new Padding(20, 6, 20, 6),
+        BackColor = UITheme.Soft
+    };
+
+    private readonly Label lblAlertBanner = new()
+    {
+        Dock = DockStyle.Top,
+        Height = 28,
+        BackColor = Color.FromArgb(254, 226, 226),
+        ForeColor = Color.FromArgb(185, 28, 28),
+        Font = UITheme.FontBold(9f),
+        TextAlign = ContentAlignment.MiddleLeft,
+        Padding = new Padding(20, 0, 0, 0),
+        Visible = false
+    };
+
+    private readonly HashSet<string> _fullZones = new();
+
     private readonly Label lblTongSo = new()
     {
         AutoSize = true,
@@ -174,7 +205,17 @@ public class FrmQuanLyViTriLuuTru : Form
             Font = UITheme.FontBold(9f),
             ForeColor = UITheme.Navy
         };
-        cboLocKhu.Margin = new Padding(0, 0, 20, 0);
+        cboLocKhu.Margin = new Padding(0, 0, 15, 0);
+
+        var lblLocTu = new Label
+        {
+            Text = "Tủ:",
+            AutoSize = true,
+            Margin = new Padding(0, 4, 8, 0),
+            Font = UITheme.FontBold(9f),
+            ForeColor = UITheme.Navy
+        };
+        cboLocTu.Margin = new Padding(0, 0, 15, 0);
 
         var lblTim = new Label
         {
@@ -218,10 +259,20 @@ public class FrmQuanLyViTriLuuTru : Form
         cboLocKhu.SelectedIndexChanged += async (s, e) =>
         {
             _searchTimer.Stop();
+            if (!_isLoading)
+            {
+                await LoadTuListAsync();
+                await LoadDataAsync();
+            }
+        };
+
+        cboLocTu.SelectedIndexChanged += async (s, e) =>
+        {
+            _searchTimer.Stop();
             if (!_isLoading) await LoadDataAsync();
         };
 
-        flpFilterLeft.Controls.AddRange(new Control[] { lblLocKhu, cboLocKhu, lblTim, txtTimKiem, btnTim });
+        flpFilterLeft.Controls.AddRange(new Control[] { lblLocKhu, cboLocKhu, lblLocTu, cboLocTu, lblTim, txtTimKiem, btnTim });
 
         var flpFilterRight = new FlowLayoutPanel
         {
@@ -267,8 +318,31 @@ public class FrmQuanLyViTriLuuTru : Form
         dgvLocations.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
         dgvLocations.RowTemplate.Height = 32;
 
+        dgvLocations.CellFormatting += (s, e) =>
+        {
+            if (e.RowIndex >= 0 && dgvLocations.Rows[e.RowIndex].DataBoundItem is StorageLocationDto loc)
+            {
+                if (_fullZones.Contains(loc.Khu) && e.ColumnIndex == 1)
+                {
+                    e.CellStyle!.BackColor = Color.FromArgb(254, 226, 226);
+                    e.CellStyle.ForeColor = Color.FromArgb(185, 28, 28);
+                    e.CellStyle.Font = UITheme.FontBold(9.5f);
+                }
+            }
+        };
+
         pnlGridBorder.Controls.Add(dgvLocations);
         pnlGridContainer.Controls.Add(pnlGridBorder);
+
+        // 3b. Zone Summary & Alerts Panel (Dock = Top, below Filter)
+        var pnlZoneAlerts = new Panel { Dock = DockStyle.Top, Height = 75, BackColor = UITheme.Soft };
+        pnlZoneAlerts.Paint += (s, e) =>
+        {
+            using var pen = new Pen(UITheme.Line);
+            e.Graphics.DrawLine(pen, 0, pnlZoneAlerts.Height - 1, pnlZoneAlerts.Width, pnlZoneAlerts.Height - 1);
+        };
+        pnlZoneAlerts.Controls.Add(flpZoneCards);
+        pnlZoneAlerts.Controls.Add(lblAlertBanner);
 
         // 4. Bottom Action Bar (Dock = Bottom)
         var pnlBottom = new Panel { Dock = DockStyle.Bottom, Height = 55, BackColor = Color.White };
@@ -319,6 +393,7 @@ public class FrmQuanLyViTriLuuTru : Form
         // Add controls in standard reverse dock order
         Controls.Add(pnlGridContainer);
         Controls.Add(pnlBottom);
+        Controls.Add(pnlZoneAlerts);
         Controls.Add(pnlFilter);
         Controls.Add(pnlHeader);
     }
@@ -326,7 +401,137 @@ public class FrmQuanLyViTriLuuTru : Form
     private async void InitializeDataAsync()
     {
         await LoadKhuListAsync();
+        await LoadTuListAsync();
+        await LoadZoneSummariesAsync();
         await LoadDataAsync();
+    }
+
+    private async Task LoadTuListAsync()
+    {
+        try
+        {
+            var selectedKhu = cboLocKhu.SelectedIndex > 0 ? cboLocKhu.SelectedItem?.ToString() : null;
+            var tuList = await _storageService.GetDistinctTuListAsync(selectedKhu);
+
+            cboLocTu.Items.Clear();
+            cboLocTu.Items.Add("-- Tất cả các Tủ --");
+            foreach (var t in tuList)
+            {
+                cboLocTu.Items.Add(t);
+            }
+            cboLocTu.SelectedIndex = 0;
+        }
+        catch
+        {
+            // Bỏ qua lỗi nạp dropdown phụ
+        }
+    }
+
+    private void FilterByZone(string khu)
+    {
+        for (int i = 0; i < cboLocKhu.Items.Count; i++)
+        {
+            if (cboLocKhu.Items[i]?.ToString() == khu)
+            {
+                cboLocKhu.SelectedIndex = i;
+                break;
+            }
+        }
+    }
+
+    private async Task LoadZoneSummariesAsync()
+    {
+        try
+        {
+            var zones = await _storageService.GetZonesAsync();
+            _fullZones.Clear();
+
+            flpZoneCards.SuspendLayout();
+            flpZoneCards.Controls.Clear();
+
+            var anyFull = false;
+            foreach (var z in zones)
+            {
+                if (z.DaDay)
+                {
+                    _fullZones.Add(z.Khu);
+                    anyFull = true;
+                }
+
+                var card = new Panel
+                {
+                    AutoSize = true,
+                    Height = 36,
+                    Margin = new Padding(0, 2, 10, 2),
+                    Padding = new Padding(10, 5, 10, 5),
+                    Cursor = Cursors.Hand
+                };
+
+                Color bg, fg, border;
+                string statusText;
+                if (z.DaDay)
+                {
+                    bg = Color.FromArgb(254, 226, 226);
+                    fg = Color.FromArgb(185, 28, 28);
+                    border = Color.FromArgb(239, 68, 68);
+                    statusText = "⛔ ĐÃ ĐẦY 100%";
+                }
+                else if (z.TiLeLapDay >= 80)
+                {
+                    bg = Color.FromArgb(254, 243, 199);
+                    fg = Color.FromArgb(180, 83, 9);
+                    border = Color.FromArgb(245, 158, 11);
+                    statusText = $"⚠️ {z.TiLeLapDay}% ({z.ConTrong} trống)";
+                }
+                else
+                {
+                    bg = Color.FromArgb(220, 252, 231);
+                    fg = Color.FromArgb(21, 128, 61);
+                    border = Color.FromArgb(34, 197, 94);
+                    statusText = $"✅ Còn {z.ConTrong} ngăn trống";
+                }
+
+                card.BackColor = bg;
+                card.Paint += (s, e) =>
+                {
+                    using var p = new Pen(border, 1.5f);
+                    e.Graphics.DrawRectangle(p, 0, 0, card.Width - 1, card.Height - 1);
+                };
+
+                var lblCard = new Label
+                {
+                    Text = $"{z.Khu} ({z.DangChua}/{z.TongSucChua}) : {statusText}",
+                    Font = UITheme.FontBold(9f),
+                    ForeColor = fg,
+                    AutoSize = true,
+                    Dock = DockStyle.Fill,
+                    TextAlign = ContentAlignment.MiddleCenter
+                };
+
+                var khuName = z.Khu;
+                card.Click += (s, e) => FilterByZone(khuName);
+                lblCard.Click += (s, e) => FilterByZone(khuName);
+
+                card.Controls.Add(lblCard);
+                flpZoneCards.Controls.Add(card);
+            }
+
+            flpZoneCards.ResumeLayout();
+
+            if (anyFull)
+            {
+                lblAlertBanner.Text = $"⛔ CẢNH BÁO: Có {_fullZones.Count} khu vực đã đầy 100% dung lượng! Vui lòng điều phối sang khu vực khác.";
+                lblAlertBanner.Visible = true;
+            }
+            else
+            {
+                lblAlertBanner.Visible = false;
+            }
+        }
+        catch
+        {
+            // Bỏ qua lỗi nạp thẻ thống kê
+        }
     }
 
     private async Task LoadKhuListAsync()
@@ -380,6 +585,7 @@ public class FrmQuanLyViTriLuuTru : Form
             {
                 Keyword = txtTimKiem.Text.Trim(),
                 Khu = cboLocKhu.SelectedIndex > 0 ? cboLocKhu.SelectedItem?.ToString() : null,
+                Tu = cboLocTu.SelectedIndex > 0 ? cboLocTu.SelectedItem?.ToString() : null,
                 PageSize = 500
             };
 
@@ -492,6 +698,8 @@ public class FrmQuanLyViTriLuuTru : Form
 
                 dlg.Close();
                 await LoadKhuListAsync();
+                await LoadTuListAsync();
+                await LoadZoneSummariesAsync();
                 await LoadDataAsync();
             }
             catch (Exception ex)
@@ -519,6 +727,8 @@ public class FrmQuanLyViTriLuuTru : Form
             await _storageService.DeleteAsync(location.MaViTri);
             MessageBox.Show("Đã xóa vị trí lưu trữ thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
             await LoadKhuListAsync();
+            await LoadTuListAsync();
+            await LoadZoneSummariesAsync();
             await LoadDataAsync();
         }
         catch (Exception ex)

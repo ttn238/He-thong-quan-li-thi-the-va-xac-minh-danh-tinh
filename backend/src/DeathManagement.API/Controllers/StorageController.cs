@@ -9,6 +9,7 @@ namespace DeathManagement.API.Controllers;
 
 [ApiController]
 [Route("api/v1/storage-locations")]
+[Route("api/v1/storage")]
 public class StorageController : ControllerBase
 {
     private readonly IStorageService _storageService;
@@ -16,6 +17,51 @@ public class StorageController : ControllerBase
     public StorageController(IStorageService? storageService = null)
     {
         _storageService = storageService ?? new StorageService();
+    }
+
+    /// <summary>
+    /// Thống kê nhanh danh sách các Khu lưu trữ (Khu A, Khu B...), sức chứa, tỉ lệ lấp đầy và cảnh báo khi đầy 100%
+    /// GET /api/v1/storage/zones
+    /// </summary>
+    [HttpGet("zones")]
+    [Authorize]
+    public async Task<ActionResult<List<StorageZoneDto>>> GetZones()
+    {
+        var zones = await _storageService.GetZonesAsync();
+        return Ok(zones);
+    }
+
+    /// <summary>
+    /// Lấy danh sách các Tủ trong một Khu lưu trữ và danh sách các ngăn kèm trạng thái sức chứa
+    /// GET /api/v1/storage/zones/{khu}/cabinets
+    /// </summary>
+    [HttpGet("zones/{khu}/cabinets")]
+    [Authorize]
+    public async Task<ActionResult<List<StorageCabinetDto>>> GetCabinetsByZone(string khu)
+    {
+        if (string.IsNullOrWhiteSpace(khu))
+            return BadRequest(new { message = "Vui lòng chỉ định tên Khu lưu trữ." });
+
+        var cabinets = await _storageService.GetCabinetsByZoneAsync(khu);
+        return Ok(cabinets);
+    }
+
+    /// <summary>
+    /// Lấy thông tin thống kê chi tiết của một Khu lưu trữ
+    /// GET /api/v1/storage/zones/{khu}
+    /// </summary>
+    [HttpGet("zones/{khu}")]
+    [Authorize]
+    public async Task<ActionResult<StorageZoneDto>> GetZone(string khu)
+    {
+        if (string.IsNullOrWhiteSpace(khu))
+            return BadRequest(new { message = "Vui lòng chỉ định tên Khu lưu trữ." });
+
+        var zone = await _storageService.GetZoneAsync(khu);
+        if (zone == null)
+            return NotFound(new { message = $"Không tìm thấy khu lưu trữ '{khu}'." });
+
+        return Ok(zone);
     }
 
     /// <summary>

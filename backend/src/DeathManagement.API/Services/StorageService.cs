@@ -155,6 +155,32 @@ public class StorageService : IStorageService
         return await _storageRepository.GetDistinctTuListAsync(khu);
     }
 
+    public async Task<List<StorageZoneDto>> GetZonesAsync()
+    {
+        AccessControl.Require(ResourceStorage, ActionView);
+        return await _storageRepository.GetZonesSummaryAsync();
+    }
+
+    public async Task<List<StorageCabinetDto>> GetCabinetsByZoneAsync(string khu)
+    {
+        AccessControl.Require(ResourceStorage, ActionView);
+
+        if (string.IsNullOrWhiteSpace(khu))
+            throw new ArgumentException("Tên khu vực không được để trống.", nameof(khu));
+
+        return await _storageRepository.GetCabinetsByZoneAsync(khu.Trim());
+    }
+
+    public async Task<StorageZoneDto?> GetZoneAsync(string khu)
+    {
+        AccessControl.Require(ResourceStorage, ActionView);
+
+        if (string.IsNullOrWhiteSpace(khu))
+            throw new ArgumentException("Tên khu vực không được để trống.", nameof(khu));
+
+        return await _storageRepository.GetZoneSummaryAsync(khu.Trim());
+    }
+
     private static StorageLocationDto MapToDto(StorageLocation x) => new()
     {
         MaViTri = x.MaViTri,

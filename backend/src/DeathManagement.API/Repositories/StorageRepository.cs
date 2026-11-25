@@ -193,4 +193,124 @@ public class StorageRepository : IStorageRepository
                 .OrderBy(x => x)
                 .ToListAsync();
         });
+
+    private static async Task<Dictionary<int, int>> GetOccupancyMapAsync(ApplicationDbContext db)
+    {
+        var map = new Dictionary<int, int>();
+        try
+        {
+            var conn = db.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open)
+            {
+                await conn.OpenAsync();
+            }
+
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT MaViTri, ISNULL(DangChua, 0) AS DangChua FROM dbo.v_TinhTrangViTri";
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                var id = reader.GetInt32(0);
+                var occ = Convert.ToInt32(reader[1]);
+                map[id] = occ;
+            }
+        }
+        catch
+        {
+            // Trong môi trường In-Memory test hoặc khi View chưa khởi tạo, bỏ qua để fallback
+        }
+        return map;
+    }
+
+    public Task<List<StorageZoneDto>> GetZonesSummaryAsync() =>
+        WithDbAsync(async db =>
+        {
+            var occupancyMap = await GetOccupancyMapAsync(db);
+            var locations = await db.StorageLocations.AsNoTracking().ToListAsync();
+
+            return locations
+                .GroupBy(x => x.Khu)
+                .OrderBy(g => g.Key)
+                .Select(g =>
+                {
+                    var distinctTu = g.Select(x => x.Tu).Distinct().OrderBy(t => t).ToList();
+                    var tongSucChua = g.Sum(x => x.SucChua);
+                    var dangChua = g.Sum(x => occupancyMap.TryGetValue(x.MaViTri, out var occ) ? occ : 0);
+
+                    return new StorageZoneDto
+                    {
+                        Khu = g.Key,
+                        TongSoTu = distinctTu.Count,
+                        TongSoNgan = g.Count(),
+                        TongSucChua = tongSucChua,
+                        DangChua = dangChua,
+                        DanhSachTu = distinctTu
+                    };
+                })
+                .ToList();
+        });
+
+    public Task<List<StorageCabinetDto>> GetCabinetsByZoneAsync(string khu) =>
+        WithDbAsync(async db =>
+        {
+            var cleanKhu = (khu ?? string.Empty).Trim();
+            var occupancyMap = await GetOccupancyMapAsync(db);
+            var locations = await db.StorageLocations.AsNoTracking()
+                .Where(x => x.Khu == cleanKhu)
+                .ToListAsync();
+
+            return locations
+                .GroupBy(x => x.Tu)
+                .OrderBy(g => g.Key)
+                .Select(g =>
+                {
+                    var tongSucChua = g.Sum(x => x.SucChua);
+                    var dangChua = g.Sum(x => occupancyMap.TryGetValue(x.MaViTri, out var occ) ? occ : 0);
+
+                    return new StorageCabinetDto
+                    {
+                        Khu = cleanKhu,
+                        Tu = g.Key,
+                        TongSoNgan = g.Count(),
+                        TongSucChua = tongSucChua,
+                        DangChua = dangChua,
+                        DanhSachNgan = g.OrderBy(x => x.Ngan).Select(x => new StorageLocationDto
+                        {
+                            MaViTri = x.MaViTri,
+                            Khu = x.Khu,
+                            Tu = x.Tu,
+                            Ngan = x.Ngan,
+                            SucChua = x.SucChua
+                        }).ToList()
+                    };
+                })
+                .ToList();
+        });
+
+    public Task<StorageZoneDto?> GetZoneSummaryAsync(string khu) =>
+        WithDbAsync(async db =>
+        {
+            var cleanKhu = (khu ?? string.Empty).Trim();
+            var occupancyMap = await GetOccupancyMapAsync(db);
+            var locations = await db.StorageLocations.AsNoTracking()
+                .Where(x => x.Khu == cleanKhu)
+                .ToListAsync();
+
+            if (locations.Count == 0)
+                return null;
+
+            var distinctTu = locations.Select(x => x.Tu).Distinct().OrderBy(t => t).ToList();
+            var tongSucChua = locations.Sum(x => x.SucChua);
+            var dangChua = locations.Sum(x => occupancyMap.TryGetValue(x.MaViTri, out var occ) ? occ : 0);
+
+            return new StorageZoneDto
+            {
+                Khu = cleanKhu,
+                TongSoTu = distinctTu.Count,
+                TongSoNgan = locations.Count,
+                TongSucChua = tongSucChua,
+                DangChua = dangChua,
+                DanhSachTu = distinctTu
+            };
+        });
 }
