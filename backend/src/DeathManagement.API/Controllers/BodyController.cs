@@ -72,14 +72,21 @@ public class BodyController(IBodyService service) : ControllerBase
     }
 
     /// <summary>
-    /// Cập nhật thông tin hồ sơ thi thể và/hoặc trạng thái hồ sơ (Yêu cầu quyền BODY:UPDATE).
+    /// Cập nhật thông tin hồ sơ thi thể và/hoặc trạng thái hồ sơ (Task 6.4 — Yêu cầu quyền BODY:UPDATE).
     /// </summary>
     [HttpPut("{id:long}")]
-    public async Task<IActionResult> Update(long id, [FromBody] UpdateBodyRequest request)
+    public async Task<IActionResult> Update(long id, [FromBody] UpdateBodyRequest? request)
     {
+        if (request == null)
+            return BadRequest(new { message = "Dữ liệu cập nhật không hợp lệ." });
+
         await service.CapNhatAsync(id, request);
         var updated = await service.LayChiTietAsync(id);
-        return Ok(updated);
+        return Ok(new
+        {
+            message = "Cập nhật hồ sơ thi thể thành công.",
+            data = updated
+        });
     }
 
     /// <summary>

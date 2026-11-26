@@ -169,11 +169,37 @@ public class BodyService(IBodyRepository repo) : IBodyService
     {
         AccessControl.Require(ResBody, ActUpdate);
 
+        var scope = AccessControl.ScopeOf(ResBody, ActUpdate);
+        if (scope is not (AuthorizationPolicies.ScopeAll or AuthorizationPolicies.ScopePartial))
+            throw new ForbiddenException("Phạm vi quyền không hỗ trợ cập nhật hồ sơ thi thể.", ResBody, ActUpdate);
+
+        if (maHoSoThiThe <= 0)
+            throw new ArgumentException("Mã hồ sơ thi thể không hợp lệ.");
+
+        ArgumentNullException.ThrowIfNull(request);
+
+        var hasAnyChange = request.ThoiGianPhatHien.HasValue
+            || request.DiaDiem != null
+            || request.GioiTinh != null
+            || request.TuoiUocLuong.HasValue
+            || request.ChieuCao.HasValue
+            || request.DacDiemCoThe != null
+            || !string.IsNullOrWhiteSpace(request.TrangThai);
+        if (!hasAnyChange)
+            throw new ArgumentException("Vui lòng cung cấp ít nhất một thông tin cần cập nhật.");
+
         if (request.ThoiGianPhatHien.HasValue && request.ThoiGianPhatHien.Value > DateTime.Now)
             throw new ArgumentException("Thời gian phát hiện không được ở tương lai.");
 
-        if (request.DiaDiem != null && request.DiaDiem.Trim().Length > 255)
-            throw new ArgumentException("Địa điểm phát hiện không được vượt quá 255 ký tự.");
+        if (request.DiaDiem != null)
+        {
+            var trimmedDiaDiem = request.DiaDiem.Trim();
+            if (trimmedDiaDiem.Length == 0)
+                throw new ArgumentException("Địa điểm phát hiện không được để trống.");
+            if (trimmedDiaDiem.Length > 255)
+                throw new ArgumentException("Địa điểm phát hiện không được vượt quá 255 ký tự.");
+            request.DiaDiem = trimmedDiaDiem;
+        }
 
         if (request.GioiTinh != null)
         {
@@ -187,16 +213,19 @@ public class BodyService(IBodyRepository repo) : IBodyService
         if (request.TuoiUocLuong.HasValue && (request.TuoiUocLuong < 0 || request.TuoiUocLuong > 130))
             throw new ArgumentException("Tuổi ước lượng phải từ 0 đến 130.");
 
+        if (request.DacDiemCoThe != null)
+            request.DacDiemCoThe = request.DacDiemCoThe.Trim();
+
         if (!string.IsNullOrWhiteSpace(request.TrangThai))
         {
             ValidateStatusAndRolePermission(request.TrangThai.Trim());
         }
 
         // Nhân viên nhà xác (PARTIAL) không được sửa các trường thông tin điều tra nhạy cảm
-        if (IsRestrictedUpdateScope() && (request.DiaDiem != null || request.DacDiemCoThe != null || request.ThoiGianPhatHien.HasValue))
+        if (IsRestrictedUpdateScope() && (request.DiaDiem != null || request.DacDiemCoThe != null || request.ChieuCao.HasValue || request.ThoiGianPhatHien.HasValue))
         {
             throw AccessControl.NoPermission(AccessControl.Principal, ResBody, ActUpdate,
-                "Nhân viên nhà xác chỉ được phép cập nhật trạng thái lưu giữ, không được sửa địa điểm hoặc đặc điểm nhận dạng.");
+                "Nhân viên nhà xác không được phép sửa thời gian phát hiện, địa điểm, chiều cao hoặc đặc điểm nhận dạng.");
         }
 
         var maTaiKhoan = AccessControl.UserId

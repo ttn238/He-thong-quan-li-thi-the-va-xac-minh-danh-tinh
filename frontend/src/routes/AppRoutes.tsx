@@ -6,6 +6,7 @@ import AiResultPage from '../pages/identification/AiResultPage';
 import UserManagement from '../pages/users/UserManagement';
 import RoleManagement from '../pages/roles/RoleManagement';
 import StorageManagement from '../pages/storage/StorageManagement';
+import { BodyDetailPage, BodyListPage } from '../pages/bodies';
 import { authService } from '../services/authService';
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -16,6 +17,8 @@ export default function AppRoutes() {
     return <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/dashboard" element={<RequireAuth><UserDashboard /></RequireAuth>} />
+        <Route path="/bodies" element={<RequireAuth><BodyListPage /></RequireAuth>} />
+        <Route path="/bodies/:id" element={<RequireAuth><BodyDetailPage /></RequireAuth>} />
         <Route path="/identification/ai-result" element={<RequireAuth><AiResultPage /></RequireAuth>} />
         <Route path="/identification/ai-result/:requestId" element={<RequireAuth><AiResultPage /></RequireAuth>} />
         <Route path="/users" element={<RequireAuth><UserManagement /></RequireAuth>} />

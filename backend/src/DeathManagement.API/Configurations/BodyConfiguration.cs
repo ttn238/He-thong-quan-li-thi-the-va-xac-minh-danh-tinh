@@ -11,7 +11,11 @@ public class BodyConfiguration : IEntityTypeConfiguration<Body>
 {
     public void Configure(EntityTypeBuilder<Body> b)
     {
-        b.ToTable("HoSoThiThe", t => t.HasTrigger("trg_HoSoThiThe_KiemTra"));
+        b.ToTable("HoSoThiThe", t =>
+        {
+            t.HasTrigger("trg_HoSoThiThe_KiemTra");
+            t.HasTrigger("trg_HoSoThiThe_SauDong");
+        });
         b.HasKey(x => x.MaHoSoThiThe);
 
         b.Property(x => x.ThoiGianPhatHien).IsRequired();
