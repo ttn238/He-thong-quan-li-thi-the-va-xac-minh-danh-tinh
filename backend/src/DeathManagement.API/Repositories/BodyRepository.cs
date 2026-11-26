@@ -177,6 +177,12 @@ public class BodyRepository(ApplicationDbContext db) : IBodyRepository
         // 6. Lịch sử thay đổi trạng thái (NhatKyHeThong)
         detail.LichSuTrangThai = await LayLichSuTrangThaiAsync(maHoSoThiThe);
 
+        // 7. Danh sách đặc điểm nhận dạng có cấu trúc (Task 6.7, ẩn hoàn toàn với Nhà xác)
+        if (!nhaXac)
+        {
+            detail.DacDiemNhanDang = await LayDacDiemNhanDangAsync(maHoSoThiThe);
+        }
+
         return detail;
     }
 
@@ -493,6 +499,147 @@ public class BodyRepository(ApplicationDbContext db) : IBodyRepository
 
         return result;
     }
+
+    // ─────────────────── Đặc điểm nhận dạng (Task 6.7) ───────────────────
+
+    private async Task EnsureCharacteristicsTableAsync()
+    {
+        if (!db.Database.IsSqlServer()) return;
+        await db.Database.ExecuteSqlRawAsync("""
+            IF OBJECT_ID(N'dbo.DacDiemNhanDang', N'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.DacDiemNhanDang
+                (
+                    MaDacDiem BIGINT IDENTITY(1,1) PRIMARY KEY,
+                    MaHoSoThiThe BIGINT NOT NULL,
+                    LoaiDacDiem NVARCHAR(50) NOT NULL,
+                    ViTriCoThe NVARCHAR(150) NULL,
+                    MoTa NVARCHAR(500) NOT NULL,
+                    NgayGhiNhan DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+                    CONSTRAINT FK_DacDiemNhanDang_HoSoThiThe
+                        FOREIGN KEY (MaHoSoThiThe) REFERENCES dbo.HoSoThiThe(MaHoSoThiThe) ON DELETE CASCADE,
+                    CONSTRAINT CK_DacDiemNhanDang_Loai
+                        CHECK (LoaiDacDiem IN (N'Seo', N'HinhXam', N'VetBot', N'Rang', N'DiTat', N'TocDa', N'TrangPhuc', N'Khac'))
+                );
+            END
+            """);
+    }
+
+    public async Task<List<BodyCharacteristicDto>> LayDacDiemNhanDangAsync(long maHoSoThiThe)
+    {
+        await EnsureCharacteristicsTableAsync();
+
+        return await db.Set<BodyCharacteristic>()
+            .AsNoTracking()
+            .Where(x => x.MaHoSoThiThe == maHoSoThiThe)
+            .OrderByDescending(x => x.NgayGhiNhan)
+            .ThenByDescending(x => x.MaDacDiem)
+            .Select(x => new BodyCharacteristicDto
+            {
+                MaDacDiem    = x.MaDacDiem,
+                MaHoSoThiThe = x.MaHoSoThiThe,
+                LoaiDacDiem  = x.LoaiDacDiem,
+                ViTriCoThe   = x.ViTriCoThe,
+                MoTa         = x.MoTa,
+                NgayGhiNhan  = x.NgayGhiNhan
+            })
+            .ToListAsync();
+    }
+
+    public async Task<BodyCharacteristicDto> ThemDacDiemNhanDangAsync(
+        long maHoSoThiThe, SaveBodyCharacteristicRequest request, long maTaiKhoan)
+    {
+        await EnsureCharacteristicsTableAsync();
+
+        var body = await db.Set<Body>().FindAsync(maHoSoThiThe)
+                   ?? throw new KeyNotFoundException($"Không tìm thấy hồ sơ thi thể #{maHoSoThiThe}.");
+
+        if (body.TrangThai == Body.StatusDongHoSo)
+            throw new InvalidOperationException("Hồ sơ đã đóng. Vui lòng mở lại hồ sơ trước khi thêm đặc điểm nhận dạng.");
+
+        var entity = new BodyCharacteristic
+        {
+            MaHoSoThiThe = maHoSoThiThe,
+            LoaiDacDiem  = request.LoaiDacDiem,
+            ViTriCoThe   = request.ViTriCoThe,
+            MoTa         = request.MoTa,
+            NgayGhiNhan  = request.NgayGhiNhan ?? DateTime.Now
+        };
+
+        db.Set<BodyCharacteristic>().Add(entity);
+        await db.SaveChangesAsync();
+
+        await SyncBodySummaryAsync(body);
+
+        return MapCharacteristicToDto(entity);
+    }
+
+    public async Task<BodyCharacteristicDto> CapNhatDacDiemNhanDangAsync(
+        long maHoSoThiThe, long maDacDiem, SaveBodyCharacteristicRequest request, long maTaiKhoan)
+    {
+        await EnsureCharacteristicsTableAsync();
+
+        var body = await db.Set<Body>().FindAsync(maHoSoThiThe)
+                   ?? throw new KeyNotFoundException($"Không tìm thấy hồ sơ thi thể #{maHoSoThiThe}.");
+
+        if (body.TrangThai == Body.StatusDongHoSo)
+            throw new InvalidOperationException("Hồ sơ đã đóng. Vui lòng mở lại hồ sơ trước khi sửa đặc điểm nhận dạng.");
+
+        var entity = await db.Set<BodyCharacteristic>()
+                         .FirstOrDefaultAsync(x => x.MaDacDiem == maDacDiem && x.MaHoSoThiThe == maHoSoThiThe)
+                     ?? throw new KeyNotFoundException($"Không tìm thấy đặc điểm nhận dạng #{maDacDiem} thuộc hồ sơ #{maHoSoThiThe}.");
+
+        entity.LoaiDacDiem = request.LoaiDacDiem;
+        entity.ViTriCoThe  = request.ViTriCoThe;
+        entity.MoTa        = request.MoTa;
+        if (request.NgayGhiNhan.HasValue)
+            entity.NgayGhiNhan = request.NgayGhiNhan.Value;
+
+        await db.SaveChangesAsync();
+
+        await SyncBodySummaryAsync(body);
+
+        return MapCharacteristicToDto(entity);
+    }
+
+    /// <summary>
+    /// Đồng bộ tóm tắt đặc điểm nhận dạng về HoSoThiThe.DacDiemCoThe để tương thích 100%
+    /// với chức năng tìm kiếm (6.2), xem chi tiết (6.3) và đối sánh hiện có.
+    /// </summary>
+    private async Task SyncBodySummaryAsync(Body body)
+    {
+        var items = await db.Set<BodyCharacteristic>()
+            .AsNoTracking()
+            .Where(x => x.MaHoSoThiThe == body.MaHoSoThiThe)
+            .OrderBy(x => x.MaDacDiem)
+            .ToListAsync();
+
+        if (items.Count == 0) return;
+
+        var summary = string.Join("; ", items.Select(x =>
+        {
+            var label = BodyCharacteristic.GetTypeLabel(x.LoaiDacDiem);
+            return string.IsNullOrWhiteSpace(x.ViTriCoThe)
+                ? $"{label}: {x.MoTa}"
+                : $"{label} ({x.ViTriCoThe}): {x.MoTa}";
+        }));
+
+        if (body.DacDiemCoThe != summary)
+        {
+            body.DacDiemCoThe = summary;
+            await db.SaveChangesAsync();
+        }
+    }
+
+    private static BodyCharacteristicDto MapCharacteristicToDto(BodyCharacteristic x) => new()
+    {
+        MaDacDiem    = x.MaDacDiem,
+        MaHoSoThiThe = x.MaHoSoThiThe,
+        LoaiDacDiem  = x.LoaiDacDiem,
+        ViTriCoThe   = x.ViTriCoThe,
+        MoTa         = x.MoTa,
+        NgayGhiNhan  = x.NgayGhiNhan
+    };
 
     private static string NhatKyAction(string trangThaiMoi) => trangThaiMoi switch
     {

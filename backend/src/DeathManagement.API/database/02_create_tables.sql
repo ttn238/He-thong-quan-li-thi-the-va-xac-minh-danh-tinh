@@ -212,6 +212,23 @@ CREATE TABLE HoSoThiThe
                              N'DaXacDinh', N'DaBanGiao', N'DongHoSo'))
 );
 GO
+
+CREATE TABLE DacDiemNhanDang
+(
+    MaDacDiem BIGINT IDENTITY(1,1) PRIMARY KEY,
+    MaHoSoThiThe BIGINT NOT NULL,
+    LoaiDacDiem NVARCHAR(50) NOT NULL,    -- Seo | HinhXam | VetBot | Rang | DiTat | TocDa | TrangPhuc | Khac
+    ViTriCoThe NVARCHAR(150) NULL,
+    MoTa NVARCHAR(500) NOT NULL,
+    NgayGhiNhan DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+
+    CONSTRAINT FK_DacDiemNhanDang_HoSoThiThe
+        FOREIGN KEY (MaHoSoThiThe) REFERENCES HoSoThiThe(MaHoSoThiThe) ON DELETE CASCADE,
+
+    CONSTRAINT CK_DacDiemNhanDang_Loai
+        CHECK (LoaiDacDiem IN (N'Seo', N'HinhXam', N'VetBot', N'Rang', N'DiTat', N'TocDa', N'TrangPhuc', N'Khac'))
+);
+GO
  
 CREATE TABLE HoSoNguoiMatTich
 (

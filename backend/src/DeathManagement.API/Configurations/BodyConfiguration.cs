@@ -29,6 +29,27 @@ public class BodyConfiguration : IEntityTypeConfiguration<Body>
     }
 }
 
+public class BodyCharacteristicConfiguration : IEntityTypeConfiguration<BodyCharacteristic>
+{
+    public void Configure(EntityTypeBuilder<BodyCharacteristic> b)
+    {
+        b.ToTable("DacDiemNhanDang");
+        b.HasKey(x => x.MaDacDiem);
+
+        b.Property(x => x.MaDacDiem).ValueGeneratedOnAdd();
+        b.Property(x => x.MaHoSoThiThe).IsRequired();
+        b.Property(x => x.LoaiDacDiem).HasMaxLength(50).IsRequired();
+        b.Property(x => x.ViTriCoThe).HasMaxLength(150);
+        b.Property(x => x.MoTa).HasMaxLength(500).IsRequired();
+        b.Property(x => x.NgayGhiNhan).IsRequired();
+
+        b.HasOne(x => x.HoSoThiThe)
+            .WithMany(h => h.DacDiemNhanDangs)
+            .HasForeignKey(x => x.MaHoSoThiThe)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
 public class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
 {
     public void Configure(EntityTypeBuilder<AuditLog> b)

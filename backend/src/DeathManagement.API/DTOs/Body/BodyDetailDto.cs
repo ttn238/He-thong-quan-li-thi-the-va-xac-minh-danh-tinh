@@ -15,6 +15,9 @@ public class BodyDetailDto : BodyDto
     /// <summary>Lịch sử các lần xếp / điều chuyển vị trí lưu trữ.</summary>
     public List<BodyStorageHistoryDto> LichSuLuuTru { get; set; } = new();
 
+    /// <summary>Danh sách đặc điểm nhận dạng có cấu trúc gắn với hồ sơ (Task 6.7, ẩn với NHA_XAC).</summary>
+    public List<BodyCharacteristicDto> DacDiemNhanDang { get; set; } = new();
+
     /// <summary>Danh sách đồ vật cá nhân kèm theo thi thể (DoVatCaNhan + LoaiDoVat).</summary>
     public List<BodyPersonalItemDto> DoVatCaNhan { get; set; } = new();
 

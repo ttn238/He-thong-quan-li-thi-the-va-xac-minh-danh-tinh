@@ -31,6 +31,9 @@ public class UpdateBodyRequest
 
     /// <summary>Lý do hoặc ghi chú khi thay đổi trạng thái (bắt buộc khi mở lại hồ sơ đã đóng).</summary>
     public string? LyDoChuyenTrangThai { get; set; }
+
+    /// <summary>Danh sách đặc điểm nhận dạng bổ sung khi cập nhật hồ sơ (tùy chọn, Task 6.7).</summary>
+    public List<SaveBodyCharacteristicRequest>? DacDiemNhanDang { get; set; }
 }
 
 /// <summary>

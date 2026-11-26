@@ -315,7 +315,7 @@ public class FrmDashboard : Form
 
         if (AccessControl.Can(ResourceBody, ActionCreate))
         {
-            pnlButtons.Controls.Add(CreateQuickActionButton("📁 Lập hồ sơ thi thể (Body)", ColorTranslator.FromHtml("#34495e"), () =>
+            pnlButtons.Controls.Add(CreateQuickActionButton("📁 Lập hồ sơ thi thể", ColorTranslator.FromHtml("#34495e"), () =>
             {
                 if (!PermissionUi.Check(this, ResourceBody, ActionCreate)) return;
                 using var f = new FrmLapHoSoThiThe();

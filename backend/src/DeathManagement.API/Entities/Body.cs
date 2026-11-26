@@ -72,6 +72,9 @@ public class Body
     /// <summary>Liên kết Tin báo tương ứng (nếu có).</summary>
     public int? MaTinBao { get; set; }
 
+    /// <summary>Danh sách đặc điểm nhận dạng có cấu trúc gắn với hồ sơ thi thể (Task 6.7).</summary>
+    public ICollection<BodyCharacteristic> DacDiemNhanDangs { get; set; } = new List<BodyCharacteristic>();
+
     // ─────────────── Hàm tiện ích trạng thái ───────────────
 
     public static bool IsValidStatus(string? status)
@@ -124,5 +127,57 @@ public class Body
         StatusDongHoSo      => "#424949",
         StatusTiepTucLuuGiu => "#78281F",
         _                   => "#1E293B"
+    };
+}
+
+/// <summary>
+/// Ánh xạ bảng DacDiemNhanDang — quản lý từng đặc điểm nhận dạng nổi bật gắn với hồ sơ thi thể (Task 6.7).
+/// </summary>
+public class BodyCharacteristic
+{
+    public const string TypeSeo       = "Seo";
+    public const string TypeHinhXam   = "HinhXam";
+    public const string TypeVetBot    = "VetBot";
+    public const string TypeRang      = "Rang";
+    public const string TypeDiTat     = "DiTat";
+    public const string TypeTocDa     = "TocDa";
+    public const string TypeTrangPhuc = "TrangPhuc";
+    public const string TypeKhac      = "Khac";
+
+    public static readonly IReadOnlyList<string> ValidTypes =
+    [
+        TypeSeo,
+        TypeHinhXam,
+        TypeVetBot,
+        TypeRang,
+        TypeDiTat,
+        TypeTocDa,
+        TypeTrangPhuc,
+        TypeKhac
+    ];
+
+    public long MaDacDiem { get; set; }
+    public long MaHoSoThiThe { get; set; }
+    public string LoaiDacDiem { get; set; } = TypeKhac;
+    public string? ViTriCoThe { get; set; }
+    public string MoTa { get; set; } = string.Empty;
+    public DateTime NgayGhiNhan { get; set; } = DateTime.Now;
+
+    public Body? HoSoThiThe { get; set; }
+
+    public static bool IsValidType(string? type)
+        => !string.IsNullOrWhiteSpace(type) && ValidTypes.Contains(type.Trim(), StringComparer.Ordinal);
+
+    public static string GetTypeLabel(string? type) => type switch
+    {
+        TypeSeo       => "Vết sẹo",
+        TypeHinhXam   => "Hình xăm",
+        TypeVetBot    => "Vết bớt",
+        TypeRang      => "Đặc điểm răng",
+        TypeDiTat     => "Dị tật",
+        TypeTocDa     => "Tóc / Da",
+        TypeTrangPhuc => "Trang phục",
+        TypeKhac      => "Đặc điểm khác",
+        _             => type ?? "Đặc điểm khác"
     };
 }

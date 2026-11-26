@@ -33,4 +33,7 @@ public class CreateBodyRequest
 
     /// <summary>Liên kết Tin báo nếu hồ sơ được lập từ một tin báo có sẵn.</summary>
     public int? MaTinBao { get; set; }
+
+    /// <summary>Danh sách đặc điểm nhận dạng có cấu trúc kèm theo khi lập hồ sơ (tùy chọn, Task 6.7).</summary>
+    public List<SaveBodyCharacteristicRequest>? DacDiemNhanDang { get; set; }
 }

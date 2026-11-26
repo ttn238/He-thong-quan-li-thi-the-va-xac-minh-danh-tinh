@@ -8,6 +8,7 @@ import {
   type BodyRecord,
 } from '../../types/Body';
 import {
+  BodyCharacteristicsSection,
   BodyEditForm,
   canEditBody,
   formatDateTimeDisplay,
@@ -253,6 +254,17 @@ export const BodyDetailPage: React.FC = () => {
               </div>
             )}
           </div>
+        )}
+
+        {!loading && !error && body && (
+          <BodyCharacteristicsSection
+            bodyId={body.maHoSoThiThe}
+            initialItems={body.dacDiemNhanDang}
+            canManage={allowEdit && !restricted}
+            restricted={restricted || !!body.cheDoHanCheNhaXac}
+            closed={closed}
+            onChanged={fetchDetail}
+          />
         )}
       </div>
     </div>

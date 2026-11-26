@@ -41,4 +41,16 @@ public interface IBodyRepository
 
     /// <summary>Lấy lịch sử thay đổi trạng thái của hồ sơ thi thể từ bảng NhatKyHeThong.</summary>
     Task<List<BodyStatusHistoryDto>> LayLichSuTrangThaiAsync(long maHoSoThiThe);
+
+    /// <summary>Lấy danh sách đặc điểm nhận dạng gắn với hồ sơ thi thể (Task 6.7).</summary>
+    Task<List<BodyCharacteristicDto>> LayDacDiemNhanDangAsync(long maHoSoThiThe)
+        => Task.FromResult(new List<BodyCharacteristicDto>());
+
+    /// <summary>Thêm mới một đặc điểm nhận dạng cho hồ sơ thi thể (Task 6.7).</summary>
+    Task<BodyCharacteristicDto> ThemDacDiemNhanDangAsync(long maHoSoThiThe, SaveBodyCharacteristicRequest request, long maTaiKhoan)
+        => throw new NotSupportedException();
+
+    /// <summary>Cập nhật một đặc điểm nhận dạng đã có của hồ sơ thi thể (Task 6.7).</summary>
+    Task<BodyCharacteristicDto> CapNhatDacDiemNhanDangAsync(long maHoSoThiThe, long maDacDiem, SaveBodyCharacteristicRequest request, long maTaiKhoan)
+        => throw new NotSupportedException();
 }

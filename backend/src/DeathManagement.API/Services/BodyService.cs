@@ -122,6 +122,7 @@ public class BodyService(IBodyRepository repo) : IBodyService
             detail.DacDiemCoThe = null;
             detail.MaTinBao     = null;
             detail.TinBao       = null;
+            detail.DacDiemNhanDang.Clear();
         }
 
         if (!coQuyenXemDoVat)
@@ -286,6 +287,97 @@ public class BodyService(IBodyRepository repo) : IBodyService
             ?? throw new KeyNotFoundException($"Không tìm thấy hồ sơ thi thể #{maHoSoThiThe}.");
 
         return await repo.LayLichSuTrangThaiAsync(maHoSoThiThe);
+    }
+
+    // ─────────────────── Đặc điểm nhận dạng (Task 6.7) ───────────────────
+
+    /// <inheritdoc />
+    public async Task<List<BodyCharacteristicDto>> LayDacDiemNhanDangAsync(long maHoSoThiThe)
+    {
+        AccessControl.Require(ResBody, ActView);
+        if (IsRestrictedScope())
+            throw AccessControl.NoPermission(AccessControl.Principal, ResBody, ActView,
+                "Tài khoản phạm vi hạn chế (Nhà xác) không được phép xem chi tiết đặc điểm nhận dạng.");
+
+        if (maHoSoThiThe <= 0)
+            throw new ArgumentException("Mã hồ sơ thi thể không hợp lệ.");
+
+        _ = await repo.LayTheoMaAsync(maHoSoThiThe)
+            ?? throw new KeyNotFoundException($"Không tìm thấy hồ sơ thi thể #{maHoSoThiThe}.");
+
+        return await repo.LayDacDiemNhanDangAsync(maHoSoThiThe);
+    }
+
+    /// <inheritdoc />
+    public async Task<BodyCharacteristicDto> ThemDacDiemNhanDangAsync(
+        long maHoSoThiThe, SaveBodyCharacteristicRequest request)
+    {
+        AccessControl.Require(ResBody, ActUpdate);
+        if (IsRestrictedUpdateScope())
+            throw AccessControl.NoPermission(AccessControl.Principal, ResBody, ActUpdate,
+                "Tài khoản phạm vi hạn chế (Nhà xác) không được phép thêm đặc điểm nhận dạng.");
+
+        if (maHoSoThiThe <= 0)
+            throw new ArgumentException("Mã hồ sơ thi thể không hợp lệ.");
+
+        ValidateCharacteristicRequest(request);
+
+        var maTaiKhoan = AccessControl.UserId
+            ?? throw AccessControl.NotLoggedIn(ResBody, ActUpdate);
+
+        return await repo.ThemDacDiemNhanDangAsync(maHoSoThiThe, request, maTaiKhoan);
+    }
+
+    /// <inheritdoc />
+    public async Task<BodyCharacteristicDto> CapNhatDacDiemNhanDangAsync(
+        long maHoSoThiThe, long maDacDiem, SaveBodyCharacteristicRequest request)
+    {
+        AccessControl.Require(ResBody, ActUpdate);
+        if (IsRestrictedUpdateScope())
+            throw AccessControl.NoPermission(AccessControl.Principal, ResBody, ActUpdate,
+                "Tài khoản phạm vi hạn chế (Nhà xác) không được phép cập nhật đặc điểm nhận dạng.");
+
+        if (maHoSoThiThe <= 0)
+            throw new ArgumentException("Mã hồ sơ thi thể không hợp lệ.");
+        if (maDacDiem <= 0)
+            throw new ArgumentException("Mã đặc điểm nhận dạng không hợp lệ.");
+
+        ValidateCharacteristicRequest(request);
+
+        var maTaiKhoan = AccessControl.UserId
+            ?? throw AccessControl.NotLoggedIn(ResBody, ActUpdate);
+
+        return await repo.CapNhatDacDiemNhanDangAsync(maHoSoThiThe, maDacDiem, request, maTaiKhoan);
+    }
+
+    private static void ValidateCharacteristicRequest(SaveBodyCharacteristicRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (!BodyCharacteristic.IsValidType(request.LoaiDacDiem))
+            throw new ArgumentException(
+                $"Loại đặc điểm nhận dạng không hợp lệ. Các giá trị hợp lệ: {string.Join(", ", BodyCharacteristic.ValidTypes)}.");
+
+        request.LoaiDacDiem = request.LoaiDacDiem.Trim();
+
+        if (request.ViTriCoThe != null)
+        {
+            var trimmedPos = request.ViTriCoThe.Trim();
+            if (trimmedPos.Length > 150)
+                throw new ArgumentException("Vị trí trên cơ thể không được vượt quá 150 ký tự.");
+            request.ViTriCoThe = trimmedPos.Length == 0 ? null : trimmedPos;
+        }
+
+        if (string.IsNullOrWhiteSpace(request.MoTa))
+            throw new ArgumentException("Mô tả đặc điểm nhận dạng không được để trống.");
+
+        var trimmedMoTa = request.MoTa.Trim();
+        if (trimmedMoTa.Length > 500)
+            throw new ArgumentException("Mô tả đặc điểm nhận dạng không được vượt quá 500 ký tự.");
+        request.MoTa = trimmedMoTa;
+
+        if (request.NgayGhiNhan.HasValue && request.NgayGhiNhan.Value > DateTime.Now)
+            throw new ArgumentException("Ngày ghi nhận đặc điểm không được ở tương lai.");
     }
 
     // ─────────────────────── Phương thức tiện ích ────────────────────

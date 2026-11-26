@@ -377,7 +377,7 @@ public sealed class FrmChiTietThiThe : Form
         // Group 1: State Machine (TableLayoutPanel để không cắt chữ ở mọi mức DPI)
         var grpStatus = new GroupBox
         {
-            Text = "Quy trình Chuyển đổi Trạng thái Hồ sơ (State Machine)",
+            Text = "Quy trình Chuyển đổi Trạng thái Hồ sơ",
             Dock = DockStyle.Top,
             Height = 114,
             Padding = new Padding(12, 8, 12, 8),
@@ -532,7 +532,7 @@ public sealed class FrmChiTietThiThe : Form
 
         var grpDoVat = new GroupBox
         {
-            Text = "Danh sách Đồ vật cá nhân kèm theo (DoVatCaNhan)",
+            Text = "Danh sách Đồ vật cá nhân kèm theo",
             Dock = DockStyle.Fill,
             Padding = new Padding(12, 8, 12, 8),
             Font = UITheme.FontBold(9.5f),
@@ -622,7 +622,7 @@ public sealed class FrmChiTietThiThe : Form
 
         var grpList = new GroupBox
         {
-            Text = "Danh sách Hình ảnh (sp_LayHinhAnhTheoHoSo)",
+            Text = "Danh sách Hình ảnh",
             Dock = DockStyle.Fill,
             Padding = new Padding(8),
             Margin = new Padding(0, 0, 8, 0),
@@ -655,7 +655,7 @@ public sealed class FrmChiTietThiThe : Form
     {
         var grpCurrent = new GroupBox
         {
-            Text = "Vị trí ngăn lạnh hiện tại (v_ViTriHienTai && ViTriLuuTru)",
+            Text = "Vị trí ngăn lạnh hiện tại",
             Dock = DockStyle.Top,
             Height = 86,
             Padding = new Padding(14, 10, 14, 8),
@@ -681,7 +681,7 @@ public sealed class FrmChiTietThiThe : Form
 
         var grpMove = new GroupBox
         {
-            Text = "Lịch sử xếp / điều chuyển ngăn lưu trữ (LichSuLuuTru)",
+            Text = "Lịch sử xếp / điều chuyển ngăn lưu trữ",
             Dock = DockStyle.Fill,
             Padding = new Padding(10),
             Margin = new Padding(0, 0, 0, 8),
@@ -702,7 +702,7 @@ public sealed class FrmChiTietThiThe : Form
 
         var grpAudit = new GroupBox
         {
-            Text = "Lịch sử Thay đổi Trạng thái && Truy vết Thao tác (NhatKyHeThong)",
+            Text = "Lịch sử Thay đổi Trạng thái && Truy vết Thao tác",
             Dock = DockStyle.Fill,
             Padding = new Padding(10),
             Font = UITheme.FontBold(9.5f),
@@ -748,7 +748,7 @@ public sealed class FrmChiTietThiThe : Form
     {
         var grpMatch = new GroupBox
         {
-            Text = "Danh sách Kết quả Đối sánh với Hồ sơ Người mất tích (v_DoiSanhChiTiet)",
+            Text = "Danh sách Kết quả Đối sánh với Hồ sơ Người mất tích",
             Dock = DockStyle.Fill,
             Padding = new Padding(12, 8, 12, 8),
             Font = UITheme.FontBold(9.5f),

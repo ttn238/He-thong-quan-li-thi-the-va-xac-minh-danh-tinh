@@ -9,6 +9,38 @@ export type BodyStatus =
 
 export type BodyGender = 'Nam' | 'Nu' | 'Khac' | 'KhongXacDinh';
 
+export type BodyCharacteristicType =
+  | 'Seo'
+  | 'HinhXam'
+  | 'VetBot'
+  | 'Rang'
+  | 'DiTat'
+  | 'TocDa'
+  | 'TrangPhuc'
+  | 'Khac';
+
+export interface BodyCharacteristic {
+  maDacDiem: number;
+  maHoSoThiThe: number;
+  loaiDacDiem: BodyCharacteristicType | string;
+  nhanLoaiDacDiem?: string;
+  viTriCoThe?: string | null;
+  moTa: string;
+  ngayGhiNhan: string;
+}
+
+export interface SaveBodyCharacteristicPayload {
+  loaiDacDiem: BodyCharacteristicType;
+  viTriCoThe?: string;
+  moTa: string;
+  ngayGhiNhan?: string;
+}
+
+export interface SaveBodyCharacteristicResponse {
+  message: string;
+  data: BodyCharacteristic;
+}
+
 export interface BodyRecord {
   maHoSoThiThe: number;
   thoiGianPhatHien: string;
@@ -25,6 +57,8 @@ export interface BodyRecord {
   ngan?: string | null;
   nhanTrangThai?: string;
   nhanGioiTinh?: string;
+  cheDoHanCheNhaXac?: boolean;
+  dacDiemNhanDang?: BodyCharacteristic[];
 }
 
 export interface BodyFilterParams {
@@ -94,4 +128,26 @@ export const BODY_GENDER_LABELS: Record<string, string> = {
   Nu: 'Nữ',
   Khac: 'Khác',
   KhongXacDinh: 'Không xác định',
+};
+
+export const BODY_CHARACTERISTIC_TYPE_OPTIONS: { value: BodyCharacteristicType; label: string }[] = [
+  { value: 'Seo', label: 'Vết sẹo' },
+  { value: 'HinhXam', label: 'Hình xăm' },
+  { value: 'VetBot', label: 'Vết bớt' },
+  { value: 'Rang', label: 'Đặc điểm răng' },
+  { value: 'DiTat', label: 'Dị tật' },
+  { value: 'TocDa', label: 'Tóc / Da' },
+  { value: 'TrangPhuc', label: 'Trang phục' },
+  { value: 'Khac', label: 'Đặc điểm khác' },
+];
+
+export const BODY_CHARACTERISTIC_TYPE_LABELS: Record<string, string> = {
+  Seo: 'Vết sẹo',
+  HinhXam: 'Hình xăm',
+  VetBot: 'Vết bớt',
+  Rang: 'Đặc điểm răng',
+  DiTat: 'Dị tật',
+  TocDa: 'Tóc / Da',
+  TrangPhuc: 'Trang phục',
+  Khac: 'Đặc điểm khác',
 };

@@ -141,4 +141,49 @@ public class BodyController(IBodyService service) : ControllerBase
         var history = await service.LayLichSuTrangThaiAsync(id);
         return Ok(history);
     }
+
+    /// <summary>
+    /// Lấy danh sách đặc điểm nhận dạng của hồ sơ thi thể (Task 6.7 — Yêu cầu quyền BODY:VIEW đầy đủ).
+    /// </summary>
+    [HttpGet("{id:long}/characteristics")]
+    public async Task<IActionResult> GetCharacteristics(long id)
+    {
+        var items = await service.LayDacDiemNhanDangAsync(id);
+        return Ok(items);
+    }
+
+    /// <summary>
+    /// Thêm mới một đặc điểm nhận dạng cho hồ sơ thi thể (Task 6.7 — Yêu cầu quyền BODY:UPDATE đầy đủ).
+    /// </summary>
+    [HttpPost("{id:long}/characteristics")]
+    public async Task<IActionResult> CreateCharacteristic(long id, [FromBody] SaveBodyCharacteristicRequest? request)
+    {
+        if (request == null)
+            return BadRequest(new { message = "Dữ liệu đặc điểm nhận dạng không hợp lệ." });
+
+        var created = await service.ThemDacDiemNhanDangAsync(id, request);
+        return Created($"/api/bodies/{id}/characteristics/{created.MaDacDiem}", new
+        {
+            message = "Thêm đặc điểm nhận dạng thành công.",
+            data = created
+        });
+    }
+
+    /// <summary>
+    /// Cập nhật một đặc điểm nhận dạng đã có của hồ sơ thi thể (Task 6.7 — Yêu cầu quyền BODY:UPDATE đầy đủ).
+    /// </summary>
+    [HttpPut("{id:long}/characteristics/{characteristicId:long}")]
+    public async Task<IActionResult> UpdateCharacteristic(
+        long id, long characteristicId, [FromBody] SaveBodyCharacteristicRequest? request)
+    {
+        if (request == null)
+            return BadRequest(new { message = "Dữ liệu đặc điểm nhận dạng không hợp lệ." });
+
+        var updated = await service.CapNhatDacDiemNhanDangAsync(id, characteristicId, request);
+        return Ok(new
+        {
+            message = "Cập nhật đặc điểm nhận dạng thành công.",
+            data = updated
+        });
+    }
 }
