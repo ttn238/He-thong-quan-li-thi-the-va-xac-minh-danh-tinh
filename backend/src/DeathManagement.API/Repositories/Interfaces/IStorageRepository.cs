@@ -31,4 +31,10 @@ public interface IStorageRepository
     /// Thống kê chi tiết một Khu lưu trữ cụ thể (Task 7.2)
     /// </summary>
     Task<StorageZoneDto?> GetZoneSummaryAsync(string khu);
+
+    /// <summary>
+    /// Tra cứu dòng thời gian (Timeline) các lần xếp và luân chuyển vị trí của một hồ sơ thi thể (Task 7.7)
+    /// </summary>
+    Task<List<StorageMovementHistoryDto>> GetMovementHistoryAsync(long maHoSoThiThe)
+        => Task.FromResult(new List<StorageMovementHistoryDto>());
 }

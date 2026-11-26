@@ -28,4 +28,9 @@ public interface IStorageService
     /// Lấy chi tiết thống kê một Khu lưu trữ (Task 7.2)
     /// </summary>
     Task<StorageZoneDto?> GetZoneAsync(string khu);
+
+    /// <summary>
+    /// Lấy dòng thời gian lịch sử di chuyển vị trí lưu trữ của hồ sơ thi thể (Task 7.7)
+    /// </summary>
+    Task<List<StorageMovementHistoryDto>> GetMovementHistoryAsync(long maHoSoThiThe);
 }

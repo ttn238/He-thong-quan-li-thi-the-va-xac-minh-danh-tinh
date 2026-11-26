@@ -5,6 +5,7 @@ using DeathManagement.API.DTOs.User;
 using DeathManagement.API.Entities;
 using DeathManagement.API.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace DeathManagement.API.Repositories;
 
@@ -313,4 +314,138 @@ public class StorageRepository : IStorageRepository
                 DanhSachTu = distinctTu
             };
         });
+
+    /// <summary>
+    /// Tra cứu dòng thời gian lịch sử xếp và luân chuyển vị trí của một hồ sơ thi thể (Task 7.7).
+    /// Kết nối LichSuLuuTru, ViTriLuuTru, NhatKyHeThong và TaiKhoanNguoiDung; tính Thời gian ra
+    /// theo mốc chuyển tiếp kế tiếp và gắn cờ Active cho vị trí đang lưu giữ hiện tại.
+    /// </summary>
+    public Task<List<StorageMovementHistoryDto>> GetMovementHistoryAsync(long maHoSoThiThe) =>
+        WithDbAsync(async db =>
+        {
+            var body = await db.Bodies.AsNoTracking()
+                .Where(x => x.MaHoSoThiThe == maHoSoThiThe)
+                .Select(x => new { x.MaHoSoThiThe, x.TrangThai })
+                .FirstOrDefaultAsync()
+                ?? throw new KeyNotFoundException($"Không tìm thấy hồ sơ thi thể #{maHoSoThiThe}.");
+
+            var items = new List<StorageMovementHistoryDto>();
+            var conn = db.Database.GetDbConnection();
+            var shouldClose = conn.State != ConnectionState.Open;
+            if (shouldClose) await conn.OpenAsync();
+
+            try
+            {
+                await using var cmd = conn.CreateCommand();
+                cmd.Transaction = db.Database.CurrentTransaction?.GetDbTransaction();
+                cmd.CommandText = """
+                    WITH OrderedMoves AS (
+                        SELECT
+                            ls.MaLichSu,
+                            ls.MaHoSoThiThe,
+                            ls.MaViTri,
+                            v.Khu,
+                            v.Tu,
+                            v.Ngan,
+                            ls.ThoiGian AS ThoiGianVao,
+                            LEAD(ls.ThoiGian) OVER (
+                                PARTITION BY ls.MaHoSoThiThe
+                                ORDER BY ls.ThoiGian ASC, ls.MaLichSu ASC
+                            ) AS ThoiGianRa,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY ls.MaHoSoThiThe
+                                ORDER BY ls.ThoiGian ASC, ls.MaLichSu ASC
+                            ) AS StepNo
+                        FROM dbo.LichSuLuuTru ls
+                        INNER JOIN dbo.ViTriLuuTru v ON v.MaViTri = ls.MaViTri
+                        WHERE ls.MaHoSoThiThe = @MaHoSoThiThe
+                    )
+                    SELECT
+                        m.MaLichSu,
+                        m.MaHoSoThiThe,
+                        m.MaViTri,
+                        m.Khu,
+                        m.Tu,
+                        m.Ngan,
+                        m.ThoiGianVao,
+                        m.ThoiGianRa,
+                        m.StepNo,
+                        nk.MaTaiKhoan,
+                        tk.HoTen,
+                        tk.TenDangNhap,
+                        nk.HanhDong,
+                        nk.DoiTuongTacDong
+                    FROM OrderedMoves m
+                    OUTER APPLY (
+                        SELECT TOP 1 n.MaTaiKhoan, n.HanhDong, n.DoiTuongTacDong
+                        FROM dbo.NhatKyHeThong n
+                        WHERE n.DoiTuongTacDong LIKE CONCAT(N'LichSuLuuTru#', m.MaLichSu, N'%')
+                        ORDER BY n.ThoiGian DESC, n.MaNhatKy DESC
+                    ) nk
+                    LEFT JOIN dbo.TaiKhoanNguoiDung tk ON tk.MaTaiKhoan = nk.MaTaiKhoan
+                    ORDER BY m.ThoiGianVao ASC, m.MaLichSu ASC;
+                    """;
+
+                var param = cmd.CreateParameter();
+                param.ParameterName = "@MaHoSoThiThe";
+                param.Value = maHoSoThiThe;
+                cmd.Parameters.Add(param);
+
+                var isBodyActiveInStorage = body.TrangThai is not (Body.StatusDaBanGiao or Body.StatusDongHoSo);
+
+                await using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    var thoiGianRa = reader.IsDBNull(7) ? (DateTime?)null : reader.GetDateTime(7);
+                    var stepNo = reader.GetInt64(8);
+                    var maTaiKhoan = reader.IsDBNull(9) ? (long?)null : reader.GetInt64(9);
+                    var hoTen = reader.IsDBNull(10) ? null : reader.GetString(10);
+                    var tenDangNhap = reader.IsDBNull(11) ? null : reader.GetString(11);
+                    var doiTuong = reader.IsDBNull(13) ? null : reader.GetString(13);
+
+                    var nguoiThaoTac = !string.IsNullOrWhiteSpace(hoTen)
+                        ? (!string.IsNullOrWhiteSpace(tenDangNhap) ? $"{hoTen} ({tenDangNhap})" : hoTen)
+                        : (maTaiKhoan.HasValue ? $"Tài khoản #{maTaiKhoan}" : "Hệ thống");
+
+                    var lyDo = ExtractMovementReason(doiTuong, stepNo);
+
+                    items.Add(new StorageMovementHistoryDto
+                    {
+                        MaLichSu       = reader.GetInt64(0),
+                        MaHoSoThiThe   = reader.GetInt64(1),
+                        MaViTri        = reader.GetInt32(2),
+                        Khu            = reader.GetString(3),
+                        Tu             = reader.GetString(4),
+                        Ngan           = reader.GetString(5),
+                        ThoiGianVao    = reader.GetDateTime(6),
+                        ThoiGianRa     = thoiGianRa,
+                        MaTaiKhoan     = maTaiKhoan,
+                        NguoiThaoTac   = nguoiThaoTac,
+                        LyDo           = lyDo,
+                        LaViTriHienTai = thoiGianRa == null && isBodyActiveInStorage
+                    });
+                }
+            }
+            finally
+            {
+                if (shouldClose && conn.State == ConnectionState.Open)
+                    await conn.CloseAsync();
+            }
+
+            return items;
+        });
+
+    private static string ExtractMovementReason(string? doiTuongTacDong, long stepNo)
+    {
+        if (!string.IsNullOrWhiteSpace(doiTuongTacDong))
+        {
+            var colonIdx = doiTuongTacDong.IndexOf(':');
+            if (colonIdx >= 0 && colonIdx + 1 < doiTuongTacDong.Length)
+            {
+                var extracted = doiTuongTacDong[(colonIdx + 1)..].Trim();
+                if (extracted.Length > 0) return extracted;
+            }
+        }
+        return stepNo <= 1 ? "Tiếp nhận và xếp ngăn lưu trữ ban đầu" : "Điều chuyển sang vị trí lưu trữ mới";
+    }
 }

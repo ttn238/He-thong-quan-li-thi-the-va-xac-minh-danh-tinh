@@ -10,6 +10,7 @@ import {
 import {
   BodyCharacteristicsSection,
   BodyEditForm,
+  StorageMovementTimeline,
   canEditBody,
   formatDateTimeDisplay,
   isBodyClosed,
@@ -265,6 +266,10 @@ export const BodyDetailPage: React.FC = () => {
             closed={closed}
             onChanged={fetchDetail}
           />
+        )}
+
+        {!loading && !error && body && (
+          <StorageMovementTimeline bodyId={body.maHoSoThiThe} />
         )}
       </div>
     </div>

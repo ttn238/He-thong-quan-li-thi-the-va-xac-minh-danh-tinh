@@ -5,6 +5,7 @@ import {
   UpdateStorageLocationPayload,
   StorageLocationFilterParams,
   PagedStorageLocationResult,
+  StorageMovementItem,
 } from '../types/StorageLocation';
 
 export const storageService = {
@@ -65,6 +66,14 @@ export const storageService = {
     return await ApiClient.request<{ message: string }>(`/storage-locations/${id}`, {
       method: 'DELETE',
     });
+  },
+
+  /**
+   * Tra cứu dòng thời gian lịch sử xếp và luân chuyển vị trí của hồ sơ thi thể (Task 7.7)
+   * GET /api/v1/storage/history/{maHoSoThiThe}
+   */
+  async getMovementHistory(maHoSoThiThe: number): Promise<StorageMovementItem[]> {
+    return await ApiClient.get<StorageMovementItem[]>(`/storage/history/${maHoSoThiThe}`);
   },
 };
 

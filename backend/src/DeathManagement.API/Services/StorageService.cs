@@ -181,6 +181,16 @@ public class StorageService : IStorageService
         return await _storageRepository.GetZoneSummaryAsync(khu.Trim());
     }
 
+    public async Task<List<StorageMovementHistoryDto>> GetMovementHistoryAsync(long maHoSoThiThe)
+    {
+        AccessControl.RequireAny((ResourceStorage, ActionView), (ResourceBody, ActionView));
+
+        if (maHoSoThiThe <= 0)
+            throw new ArgumentException("Mã hồ sơ thi thể không hợp lệ.", nameof(maHoSoThiThe));
+
+        return await _storageRepository.GetMovementHistoryAsync(maHoSoThiThe);
+    }
+
     private static StorageLocationDto MapToDto(StorageLocation x) => new()
     {
         MaViTri = x.MaViTri,

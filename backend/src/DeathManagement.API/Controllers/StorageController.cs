@@ -20,6 +20,29 @@ public class StorageController : ControllerBase
     }
 
     /// <summary>
+    /// Lấy dòng thời gian lịch sử xếp và luân chuyển vị trí của một hồ sơ thi thể (Task 7.7)
+    /// GET /api/v1/storage/history/{maHoSoThiThe}
+    /// </summary>
+    [HttpGet("history/{maHoSoThiThe:long}")]
+    [Authorize]
+    public async Task<ActionResult<List<StorageMovementHistoryDto>>> GetMovementHistory(long maHoSoThiThe)
+    {
+        try
+        {
+            var history = await _storageService.GetMovementHistoryAsync(maHoSoThiThe);
+            return Ok(history);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Thống kê nhanh danh sách các Khu lưu trữ (Khu A, Khu B...), sức chứa, tỉ lệ lấp đầy và cảnh báo khi đầy 100%
     /// GET /api/v1/storage/zones
     /// </summary>

@@ -38,3 +38,19 @@ export interface PagedStorageLocationResult {
   hasPreviousPage: boolean;
   hasNextPage: boolean;
 }
+
+export interface StorageMovementItem {
+  maLichSu: number;
+  maHoSoThiThe: number;
+  maViTri: number;
+  khu: string;
+  tu: string;
+  ngan: string;
+  viTriDayDu?: string;
+  thoiGianVao: string;
+  thoiGianRa?: string | null;
+  maTaiKhoan?: number | null;
+  nguoiThaoTac: string;
+  lyDo: string;
+  laViTriHienTai: boolean;
+}
