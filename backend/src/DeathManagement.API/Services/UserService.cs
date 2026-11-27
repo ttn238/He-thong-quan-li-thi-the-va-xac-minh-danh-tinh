@@ -1,3 +1,4 @@
+using DeathManagement.API.Common;
 using DeathManagement.API.DTOs.User;
 using DeathManagement.API.Entities;
 using DeathManagement.API.Repositories;
@@ -22,6 +23,7 @@ public class UserService : IUserService
 
     public async Task<PagedResult<UserDto>> GetPagedListAsync(UserFilterRequest filter)
     {
+        AccessControl.Require(ResourceAccount, ActionView);
         var pagedUsers = await _userRepository.GetPagedListAsync(filter);
 
         var dtos = pagedUsers.Items.Select(MapToDto).ToList();
@@ -37,18 +39,24 @@ public class UserService : IUserService
 
     public async Task<UserDto?> GetByIdAsync(long id)
     {
+        AccessControl.RequireSelfOr(id, ResourceAccount, ActionView);   // xem hồ sơ của chính mình thì được
         var user = await _userRepository.GetByIdAsync(id);
         return user == null ? null : MapToDto(user);
     }
 
     public async Task<UserDto?> GetByUsernameAsync(string username)
     {
+        AccessControl.Require(ResourceAccount, ActionView);
         var user = await _userRepository.GetByUsernameAsync(username);
         return user == null ? null : MapToDto(user);
     }
 
     public async Task<UserDto> CreateAsync(CreateUserRequest request)
     {
+        AccessControl.Require(ResourceAccount, ActionCreate);
+        if (!RoleConstants.IsValidRoleId(request.MaVaiTro))
+            throw new InvalidOperationException($"Vai trò với mã #{request.MaVaiTro} không hợp lệ.");
+
         var username = request.TenDangNhap.Trim();
 
         // Kiểm tra trùng lặp
@@ -90,8 +98,19 @@ public class UserService : IUserService
 
     public async Task<UserDto?> UpdateAsync(long id, UpdateUserRequest request)
     {
+        AccessControl.Require(ResourceAccount, ActionUpdate);
+        if (!RoleConstants.IsValidRoleId(request.MaVaiTro))
+            throw new InvalidOperationException($"Vai trò với mã #{request.MaVaiTro} không hợp lệ.");
+
         var existing = await _userRepository.GetByIdAsync(id);
         if (existing == null) return null;
+
+        if (existing.MaVaiTro != request.MaVaiTro)
+        {
+            AccessControl.Require(ResourcePermission, ActionUpdate);   // đổi vai trò = phân quyền
+            if (AccessControl.UserId == id)
+                throw new InvalidOperationException("Không được tự thay đổi vai trò của chính mình.");
+        }
 
         // Kiểm tra trùng lặp email, sdt, cccd ngoại trừ chính user này
         if (!string.IsNullOrWhiteSpace(request.Email) && await _userRepository.ExistsByEmailAsync(request.Email.Trim(), id))
@@ -114,17 +133,11 @@ public class UserService : IUserService
 
         var updated = await _userRepository.UpdateAsync(existing);
         return MapToDto(updated);
-
-        if (existing.MaVaiTro != request.MaVaiTro)
-        {
-            AccessControl.Require(ResourcePermission, ActionUpdate);   // đổi vai trò = phân quyền
-            if (AccessControl.UserId == id)
-                throw new InvalidOperationException("Không được tự thay đổi vai trò của chính mình.");
-        }
     }
 
     public async Task<UserDto?> UpdateProfileAsync(long currentUserId, UpdateProfileRequest request)
     {
+        AccessControl.RequireSelfOr(currentUserId, ResourceAccount, ActionUpdate);
         var existing = await _userRepository.GetByIdAsync(currentUserId);
         if (existing == null) return null;
 
@@ -145,6 +158,8 @@ public class UserService : IUserService
 
     public async Task<bool> ChangeStatusAsync(long adminId, long targetUserId, ChangeUserStatusRequest request)
     {
+        AccessControl.Require(ResourceAccount, ActionUpdate);
+
         // Chống quản trị viên tự khóa tài khoản của chính mình
         if (adminId == targetUserId && (string.Equals(request.TrangThai, "Khoa", StringComparison.OrdinalIgnoreCase) ||
                                        string.Equals(request.TrangThai, "KhoaTam", StringComparison.OrdinalIgnoreCase)))
@@ -157,6 +172,8 @@ public class UserService : IUserService
 
     public async Task<bool> ResetPasswordAsync(long adminId, long targetUserId, ResetPasswordRequest request)
     {
+        AccessControl.Require(ResourceAccount, ActionUpdate);
+
         if (string.IsNullOrWhiteSpace(request.MatKhauMoi) || request.MatKhauMoi.Length < 6)
         {
             throw new InvalidOperationException("Mật khẩu mới phải có độ dài tối thiểu 6 ký tự.");
@@ -168,6 +185,8 @@ public class UserService : IUserService
 
     public async Task<bool> DeleteAsync(long adminId, long targetUserId)
     {
+        AccessControl.Require(ResourceAccount, ActionUpdate);   // ma trận không có ACCOUNT:DELETE; xóa mềm = cập nhật trạng thái
+
         if (adminId == targetUserId)
         {
             throw new InvalidOperationException("Quản trị viên không thể tự xóa tài khoản của chính mình.");
@@ -199,8 +218,6 @@ public class UserService : IUserService
             5 => "NGUOI_DAN",
             _ => "OTHER"
         };
-
-        string tenVaiTro = user.Role?.TenVaiTro ?? "KhongXacDinh";
 
         return new UserDto
         {

@@ -14,7 +14,7 @@ public class AuthController(IAuthService auth) : ControllerBase
         if (string.IsNullOrWhiteSpace(req.TenDangNhap) || string.IsNullOrEmpty(req.MatKhau))
             return BadRequest(new { message = "Vui lòng nhập tên đăng nhập và mật khẩu." });
 
-        var (ket, tk) = await auth.DangNhapAsync(req.TenDangNhap, req.MatKhau);
+        var (ket, tk, _) = await auth.DangNhapAsync(req.TenDangNhap, req.MatKhau);
         return ket switch
         {
             KetQuaDangNhap.ThanhCong => Ok(tk),
