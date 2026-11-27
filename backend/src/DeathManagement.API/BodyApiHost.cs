@@ -24,6 +24,8 @@ internal static class BodyApiHost
         builder.Services.AddScoped<IRoleService, RoleService>();
         builder.Services.AddScoped<IBodyRepository, BodyRepository>();
         builder.Services.AddScoped<IBodyService, BodyService>();
+        builder.Services.AddScoped<IMissingPersonRepository, MissingPersonRepository>();
+        builder.Services.AddScoped<IMissingPersonService, MissingPersonService>();
         builder.Services.AddScoped<IStorageRepository, StorageRepository>();
         builder.Services.AddScoped<IStorageService, StorageService>();
         builder.Services.AddControllers().AddJsonOptions(options =>

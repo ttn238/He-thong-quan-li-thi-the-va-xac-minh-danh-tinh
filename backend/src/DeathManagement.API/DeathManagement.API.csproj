@@ -18,6 +18,7 @@
 		<Compile Remove="Controllers\**" />
 		<Compile Include="Controllers\AuthController.cs" />
 		<Compile Include="Controllers\BodyController.cs" />
+		<Compile Include="Controllers\MissingPersonController.cs" />
 		<Compile Include="Controllers\RoleController.cs" />
 		<Compile Include="Controllers\StorageController.cs" />
 		<Compile Include="Controllers\UserController.cs" />
