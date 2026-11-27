@@ -34,11 +34,14 @@ public interface IBodyService
     Task<List<BodyStatusHistoryDto>> LayLichSuTrangThaiAsync(long maHoSoThiThe);
 
     /// <summary>Lấy danh sách đặc điểm nhận dạng của hồ sơ thi thể (Task 6.7). Yêu cầu quyền BODY:VIEW (ALL).</summary>
-    Task<List<BodyCharacteristicDto>> LayDacDiemNhanDangAsync(long maHoSoThiThe);
+    Task<List<BodyCharacteristicDto>> LayDacDiemNhanDangAsync(long maHoSoThiThe)
+        => Task.FromResult(new List<BodyCharacteristicDto>());
 
     /// <summary>Thêm mới một đặc điểm nhận dạng gắn với hồ sơ thi thể (Task 6.7). Yêu cầu quyền BODY:UPDATE (ALL).</summary>
-    Task<BodyCharacteristicDto> ThemDacDiemNhanDangAsync(long maHoSoThiThe, SaveBodyCharacteristicRequest request);
+    Task<BodyCharacteristicDto> ThemDacDiemNhanDangAsync(long maHoSoThiThe, SaveBodyCharacteristicRequest request)
+        => throw new NotSupportedException();
 
     /// <summary>Cập nhật một đặc điểm nhận dạng đã có của hồ sơ thi thể (Task 6.7). Yêu cầu quyền BODY:UPDATE (ALL).</summary>
-    Task<BodyCharacteristicDto> CapNhatDacDiemNhanDangAsync(long maHoSoThiThe, long maDacDiem, SaveBodyCharacteristicRequest request);
+    Task<BodyCharacteristicDto> CapNhatDacDiemNhanDangAsync(long maHoSoThiThe, long maDacDiem, SaveBodyCharacteristicRequest request)
+        => throw new NotSupportedException();
 }

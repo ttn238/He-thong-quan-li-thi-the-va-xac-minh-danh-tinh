@@ -122,7 +122,10 @@ public class UserRepository : IUserRepository
     {
         user.NgayCapNhat = DateTime.UtcNow;
 
-        _db.Users.Update(user);
+        // Thực thể đã được theo dõi thì EF tự biết trường nào đổi; gọi Update() sẽ đánh dấu TOÀN BỘ trường là đã sửa
+        // (làm interceptor phân quyền hiểu nhầm là đang đổi vai trò / mật khẩu)
+        if (_db.Entry(user).State == EntityState.Detached)
+            _db.Users.Update(user);
         await _db.SaveChangesAsync();
 
         if (user.Role == null)

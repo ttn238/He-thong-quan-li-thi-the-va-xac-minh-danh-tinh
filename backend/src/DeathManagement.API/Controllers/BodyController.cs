@@ -1,6 +1,9 @@
 using DeathManagement.API.DTOs.Body;
+using DeathManagement.API.DTOs.Image;
 using DeathManagement.API.Entities;
+using DeathManagement.API.Helpers;
 using DeathManagement.API.Services.Interfaces;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DeathManagement.API.Controllers;
@@ -12,7 +15,7 @@ namespace DeathManagement.API.Controllers;
 [ApiController]
 [Route("api/bodies")]
 [Route("api/v1/bodies")]
-public class BodyController(IBodyService service) : ControllerBase
+public class BodyController(IBodyService service, IImageService? images = null) : ControllerBase
 {
     /// <summary>
     /// Lấy danh sách hồ sơ thi thể có phân trang, tìm kiếm và lọc trạng thái (Yêu cầu quyền BODY:VIEW).
@@ -185,5 +188,65 @@ public class BodyController(IBodyService service) : ControllerBase
             message = "Cập nhật đặc điểm nhận dạng thành công.",
             data = updated
         });
+    }
+
+    /// <summary>
+    /// Tải ảnh lên cho một hồ sơ thi thể (Yêu cầu FILE:CREATE và BODY:VIEW).
+    /// Ảnh gắn hồ sơ thi thể luôn bị coi là ảnh nhạy cảm nên bắt buộc chuyển vào vùng lưu trữ riêng.
+    /// </summary>
+    [HttpPost("{id:long}/images")]
+    // Ngân sách request phải lớn hơn trần dung lượng ảnh, nếu không ASP.NET cắt luồng trước
+    // và người dùng nhận lỗi binding 400 thay vì thông báo 413 của hệ thống.
+    [RequestSizeLimit(FileHelper.MaxFileSizeInBytes * 2)]
+    public async Task<IActionResult> UploadImage(
+        long id, [FromForm] IFormFile? file, [FromForm] string? loaiHinhAnh, [FromForm] string? moTa)
+    {
+        if (images is null)
+            throw new InvalidOperationException("Dịch vụ hình ảnh chưa được cấu hình.");
+
+        if (file is null || file.Length == 0)
+            return BadRequest(new { message = "Vui lòng chọn tệp ảnh." });
+
+        if (file.Length > FileHelper.MaxFileSizeInBytes)
+            return StatusCode(StatusCodes.Status413PayloadTooLarge,
+                new { message = $"Ảnh phải lớn hơn 0 và không quá {FileHelper.MaxFileSizeInBytes / (1024 * 1024)} MB." });
+
+        if (moTa is not null && moTa.Length > 500)
+            return BadRequest(new { message = "Mô tả ảnh tối đa 500 ký tự." });
+
+        // Chặn ghi tệp trước khi biết hồ sơ có tồn tại và người gọi xem được nó hay không
+        var hoSo = await service.LayChiTietAsync(id);
+        if (hoSo is null)
+            return NotFound(new { message = $"Không tìm thấy hồ sơ thi thể #{id}." });
+
+        var req = new UploadImageRequest
+        {
+            MaHoSoThiThe = id,   // mã hồ sơ luôn lấy từ đường dẫn, không tin dữ liệu gửi lên
+            LoaiHinhAnh = string.IsNullOrWhiteSpace(loaiHinhAnh) ? ImageHelper.TypeBodyExamination : loaiHinhAnh.Trim(),
+            MoTa = string.IsNullOrWhiteSpace(moTa) ? null : moTa.Trim()
+        };
+
+        await using var stream = file.OpenReadStream();
+        var created = await images.TaiLenHinhAnhTuStreamAsync(stream, file.FileName, req);
+
+        return CreatedAtAction(nameof(GetImage), new { id, imageId = created.MaHinhAnh }, (object)created);
+    }
+
+    /// <summary>
+    /// Đọc tệp ảnh của hồ sơ thi thể. Bắt buộc JWT và quyền xem ảnh; không tồn tại đường dẫn công khai
+    /// nên trình duyệt không thể lấy ảnh nếu không qua kiểm soát truy cập (NFR1.2).
+    /// </summary>
+    [HttpGet("{id:long}/images/{imageId:long}")]
+    [ResponseCache(Location = ResponseCacheLocation.None, NoStore = true)]
+    public async Task<IActionResult> GetImage(long id, long imageId)
+    {
+        if (images is null)
+            throw new InvalidOperationException("Dịch vụ hình ảnh chưa được cấu hình.");
+
+        var ketQua = await images.DocAnhCuaHoSoThiTheAsync(id, imageId);
+        if (ketQua is null)
+            return NotFound(new { message = "Không tìm thấy ảnh hoặc bạn không có quyền xem ảnh này." });
+
+        return File(ketQua.Value.DuLieu, ketQua.Value.DinhDang);
     }
 }
