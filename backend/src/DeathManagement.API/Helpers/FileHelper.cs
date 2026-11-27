@@ -1,6 +1,7 @@
 
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 
 namespace DeathManagement.API.Helpers;
@@ -79,6 +80,11 @@ public static class FileHelper
         catch (OutOfMemoryException)
         {
             // GDI+ cũng có thể ném lỗi này khi tệp không phải ảnh hợp lệ.
+            return false;
+        }
+        catch (ExternalException)
+        {
+            // Trên .NET 10, GDI+ báo tệp hỏng qua ExternalException thay vì OutOfMemoryException.
             return false;
         }
         catch (IOException)

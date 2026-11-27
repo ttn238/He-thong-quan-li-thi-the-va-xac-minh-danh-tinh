@@ -65,6 +65,38 @@ dotnet test tests/backend/DeathManagement.Tests/DeathManagement.Tests.csproj --f
 - `PUT /bodies/{id}`: Cập nhật thông tin khám nghiệm/tiếp nhận.
 - `POST /bodies/{id}/images`: Tải ảnh thi thể lên vùng lưu trữ an toàn.
 
+#### API ảnh hồ sơ thi thể (đã triển khai)
+
+Controller `BodyController` đăng ký cả hai tiền tố `api/bodies` và `api/v1/bodies`. Hai endpoint dưới đây cần `Authorization: Bearer <JWT>`; không có đường dẫn tĩnh nào trỏ vào thư mục chứa ảnh.
+
+| Method | Endpoint | Quyền | Mô tả |
+|---|---|---|---|
+| `POST` | `/api/v1/bodies/{id}/images` | `FILE:CREATE` + `BODY:VIEW` | multipart form gồm `file` (JPG/PNG/WEBP/BMP, lớn hơn 0 và tối đa 10 MB), `loaiHinhAnh` tùy chọn (`ThiThe_KhamNghiem` mặc định, `ThiThe_KhuonMat`, `ThiThe_ToanThan`) và `moTa` tùy chọn (tối đa 500 ký tự). |
+| `GET` | `/api/v1/bodies/{id}/images/{imageId}` | `FILE:VIEW` + `BODY:VIEW` | Trả byte ảnh kèm `Content-Type` lưu trong cơ sở dữ liệu, header `no-store`. |
+
+`loaiHinhAnh` phải thuộc danh mục loại ảnh hợp lệ của `ImageHelper.LoaiHopLe`; màn hình hồ sơ chỉ gửi ba loại `ThiThe_*`. Không có trần số ảnh cho hồ sơ thi thể, khác với tin báo (5 ảnh) và hồ sơ mất tích (6 ảnh).
+
+Mã hồ sơ luôn lấy từ đường dẫn `{id}`; dữ liệu liên kết gửi trong form bị bỏ qua nên không thể gắn ảnh vào hồ sơ khác. Ảnh gắn với hồ sơ thi thể luôn được đánh dấu nhạy cảm và ghi vào `secure/`, tên tệp do hệ thống sinh theo Guid, có kiểm tra phần mở rộng, dung lượng và nội dung thực tế trước khi ghi. Trùng lặp nhận theo MD5 trong phạm vi hồ sơ: nạp lại đúng byte ảnh cho cùng hồ sơ trả 400 "Ảnh này đã được tải lên cho hồ sơ này.". Mỗi lần nạp ghi một dòng `NhatKyHeThong` với hành động `TAI_ANH#{ma}` trên `HinhAnh#{ma}`.
+
+Thứ tự kiểm tra là quyền trước, nội dung sau, rồi mới đọc hồ sơ: thiếu tệp trả 400, thiếu token trả 401, thiếu quyền trả 403, định dạng hoặc nội dung không hợp lệ trả 400 kèm thông báo tiếng Việt, hồ sơ không tồn tại trả 404. Ảnh vượt 10 MB trả 413; `RequestSizeLimit` đặt gấp hai trần dung lượng để lỗi 413 luôn là thông báo của hệ thống, request lớn hơn ngân sách này bị ASP.NET Core chặn từ khâu binding và trả 400. Thành công trả 201 với `ImageDto` (mã hồ sơ, loại ảnh, định dạng, kích thước, `laNhayCam`, người tải, thời gian) và header `Location`.
+
+Đã xác minh bằng HTTP thật ngày 27/11/2026 trên database dựng từ `database/02` đến `database/09`. Cán bộ điều tra nạp ảnh PNG 70 byte vào hồ sơ 1 nhận 201, bản ghi `HinhAnh` có `MaHoSoThiThe=1`, `LaNhayCam=1`, `DuongDan=/secure/{guid}.png`, `MaTaiKhoanTaiLen` lấy từ token; tệp vật lý chỉ nằm trong `secure/`, thư mục `public/` không được tạo. Đọc ảnh: chủ hồ sơ nhận 200 `image/png` với byte trùng khớp tệp trên đĩa, người dân nhận 403, truy cập ẩn danh nhận 401, ảnh của hồ sơ khác nhận 404. `GET /api/v1/bodies/1` trả kèm ảnh mới trong `hinhAnh` với `coQuyenXemHinhAnh=true`.
+
+Query đọc ảnh khoá theo cả `maHinhAnh` và `maHoSoThiThe`, nên ảnh thuộc hồ sơ khác trả về giống hệt trường hợp không tồn tại (404). Trình duyệt hiển thị ảnh bằng cách xin blob qua endpoint này rồi tạo object URL tạm thời, không lưu URL công khai.
+
+Kiểm thử tự động nằm tại `tests/backend/DeathManagement.Tests/BodyImageUploadTests.cs` (15 ca, không cần database thật).
+
+Muốn chạy lại luồng HTTP thật, lưu ý `Storage:RootPath` hiện trỏ `D:\DeathManagementStorage`; khi ổ đĩa không tồn tại, `ImageService` tự chuyển về `App_Data/storage` cạnh binary. Script seed chứa ký tự tiếng Việt nên sqlcmd phải đọc với codepage UTF-8 (`-f 65001`), nếu không `TenVaiTro` bị sai và `ResolveRoleCode` trả roleCode rỗng khiến mọi lời gọi bị từ chối.
+
+```powershell
+sqlcmd -S "localhost\SQLEXPRESS" -E -Q "CREATE DATABASE QL_XACMINHTHITHE_E2E"
+Get-ChildItem database/0[2-9]*.sql | ForEach-Object { sqlcmd -S "localhost\SQLEXPRESS" -d QL_XACMINHTHITHE_E2E -E -f 65001 -i $_.FullName }
+$env:ConnectionStrings__DefaultConnection = 'Server=localhost\SQLEXPRESS;Database=QL_XACMINHTHITHE_E2E;Trusted_Connection=True;TrustServerCertificate=True'
+dotnet run --project backend/src/DeathManagement.API -- --body-api --urls "http://127.0.0.1:5086;http://127.0.0.1:5000"
+```
+
+Cổng 5000 là đích proxy `/api` của `frontend/vite.config.ts`, nên bật cả hai URL để thử trực tiếp trên trình duyệt qua `http://localhost:5173/bodies/{id}`.
+
 ### 2.5. Nhóm AI & Matching (`/api/v1/identification`)
 - `POST /identification/match`: Kích hoạt đối chiếu 1 hồ sơ với cơ sở dữ liệu.
 - `GET /identification/results/{recordId}`: Xem danh sách gợi ý và điểm % matching.

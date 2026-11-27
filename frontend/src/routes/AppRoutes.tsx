@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import Login from '../pages/auth/Login';
+import BodyProfile from '../pages/bodies/BodyProfile';
 import UserDashboard from '../pages/dashboard/UserDashboard';
 import AiResultPage from '../pages/identification/AiResultPage';
 import UserManagement from '../pages/users/UserManagement';
@@ -24,6 +25,7 @@ export default function AppRoutes() {
         <Route path="/admin/roles" element={<RequireAuth><RoleManagement /></RequireAuth>} />
         <Route path="/storage" element={<RequireAuth><StorageManagement /></RequireAuth>} />
         <Route path="/storage/locations" element={<RequireAuth><StorageManagement /></RequireAuth>} />
+        <Route path="/bodies/:id" element={<RequireAuth><BodyProfile /></RequireAuth>} />
         <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>;
 }
