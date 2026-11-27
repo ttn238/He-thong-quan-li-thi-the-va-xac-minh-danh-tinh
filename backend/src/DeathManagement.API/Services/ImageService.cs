@@ -2,16 +2,38 @@ using System.Security.Cryptography;
 using DeathManagement.API.Data;
 using DeathManagement.API.DTOs.Image;
 using DeathManagement.API.Entities;
+using DeathManagement.API.Helpers;
+using DeathManagement.API.Security;
 using DeathManagement.API.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using DeathManagement.API.Security;
 using Image = DeathManagement.API.Entities.Image;
 
 namespace DeathManagement.API.Services;
 
 public class ImageService(ApplicationDbContext db) : IImageService
 {
-    private static readonly string StorageBaseDir = Path.Combine(AppContext.BaseDirectory, "App_Data", "storage");
+    private static readonly string StorageBaseDir = GetSafeStorageBaseDir();
+
+    private static string GetSafeStorageBaseDir()
+    {
+        var configured = Program.Config["Storage:RootPath"];
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            try
+            {
+                var root = Path.GetPathRoot(configured);
+                if (string.IsNullOrEmpty(root) || Directory.Exists(root))
+                {
+                    Directory.CreateDirectory(configured);
+                    return configured;
+                }
+            }
+            catch { }
+        }
+        var fallback = Path.Combine(AppContext.BaseDirectory, "App_Data", "storage");
+        try { Directory.CreateDirectory(fallback); } catch { }
+        return fallback;
+    }
 
     public string LayDuongDanVatLy(string duongDanLuuTru)
     {
@@ -151,18 +173,47 @@ public class ImageService(ApplicationDbContext db) : IImageService
         AccessControl.Require(AuthorizationPolicies.ResourceFile, AuthorizationPolicies.ActionCreate);
         req.MaTaiKhoanTaiLen = AccessControl.UserId!.Value;   // luôn lấy từ token, bỏ qua giá trị UI gửi lên
 
+        if (!req.MaHoSoThiThe.HasValue && !req.MaHoSoMatTich.HasValue
+            && !req.MaTinBao.HasValue && !req.MaXacMinh.HasValue)
+            throw new InvalidOperationException("Ảnh phải gắn với ít nhất một tin báo, hồ sơ thi thể, hồ sơ mất tích hoặc xác minh.");
+
+        if (!ImageHelper.LoaiHopLe.Contains(req.LoaiHinhAnh))
+            throw new InvalidOperationException("Loại hình ảnh không hợp lệ.");
+
+        // Người dân (phạm vi OWN) chỉ được thêm ảnh vào tin báo do chính mình tạo
+        if (req.MaTinBao.HasValue && AccessControl.RoleCode == AuthorizationPolicies.RoleCitizen)
+        {
+            var laCuaToi = await db.Database
+                .SqlQuery<int>($"SELECT COUNT(*) AS [Value] FROM TinBao WHERE MaTinBao = {req.MaTinBao} AND MaTaiKhoanTiepNhan = {req.MaTaiKhoanTaiLen}")
+                .SingleAsync();
+            if (laCuaToi == 0)
+                throw new InvalidOperationException("Bạn không có quyền thêm ảnh vào tin báo này.");
+        }
+
+        if (req.MaTinBao.HasValue
+            && await db.Images.CountAsync(x => x.MaTinBao == req.MaTinBao && x.TrangThai == "HoatDong") >= ImageHelper.MaxAnhMoiTinBao)
+            throw new InvalidOperationException($"Tin báo đã đủ {ImageHelper.MaxAnhMoiTinBao} ảnh.");
+
+        if (req.MaHoSoMatTich.HasValue
+            && await db.Images.CountAsync(x => x.MaHoSoMatTich == req.MaHoSoMatTich && x.TrangThai == "HoatDong") >= ImageHelper.MaxAnhMoiHoSoMatTich)
+            throw new InvalidOperationException($"Hồ sơ mất tích đã đủ {ImageHelper.MaxAnhMoiHoSoMatTich} ảnh.");
+
         if (!File.Exists(req.FilePath))
-            throw new FileNotFoundException("Tệp nguồn không tồn tại.", req.FilePath);
+        {
+            throw new FileNotFoundException(
+                "Không tìm thấy tệp ảnh được chọn.");
+        }
 
         var fi = new FileInfo(req.FilePath);
+        if (!FileHelper.IsValidImageExtension(fi.Name))
+            throw new InvalidOperationException("Định dạng ảnh không được hỗ trợ.");
+        if (!FileHelper.IsValidFileSize(fi.Length))
+            throw new InvalidOperationException("Ảnh phải lớn hơn 0 và không quá 10 MB.");
+        if (!FileHelper.IsValidImageContent(req.FilePath))
+            throw new InvalidOperationException("Tệp không phải ảnh hợp lệ hoặc đã bị hỏng.");
+
         var ext = fi.Extension.ToLowerInvariant();
-        var mime = ext switch
-        {
-            ".png" => "image/png",
-            ".webp" => "image/webp",
-            ".bmp" => "image/bmp",
-            _ => "image/jpeg"
-        };
+        var mime = ImageHelper.GetMimeType(fi.Name);
 
         // Quy tắc NFR1.2: Ảnh tử thi hoặc loại ThiThe_* bắt buộc gán cờ LaNhayCam = true
         var laNhayCam = req.LaNhayCam || req.MaHoSoThiThe.HasValue || req.LoaiHinhAnh.StartsWith("ThiThe_");
@@ -203,6 +254,15 @@ public class ImageService(ApplicationDbContext db) : IImageService
             hashMd5 = Convert.ToHexString(hashBytes).ToLowerInvariant();
         }
 
+        bool trung = await db.Images.AnyAsync(x => x.HashMD5 == hashMd5 && x.TrangThai == "HoatDong"
+            && x.MaTinBao == req.MaTinBao && x.MaHoSoThiThe == req.MaHoSoThiThe
+            && x.MaHoSoMatTich == req.MaHoSoMatTich && x.MaXacMinh == req.MaXacMinh);
+        if (trung)
+        {
+            try { File.Delete(destFilePath); } catch { }
+            throw new InvalidOperationException("Ảnh này đã được tải lên cho hồ sơ này.");
+        }
+
         int? width = null;
         int? height = null;
         try
@@ -239,7 +299,33 @@ public class ImageService(ApplicationDbContext db) : IImageService
         };
 
         db.Images.Add(entity);
-        await db.SaveChangesAsync();
+
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            // Lấy lỗi chi tiết từ SQL Server / Entity Framework
+            string loiChiTiet = ex.ToString();
+
+            try
+            {
+                if (File.Exists(destFilePath))
+                    File.Delete(destFilePath);
+            }
+            catch
+            {
+                // Không che mất lỗi gốc.
+            }
+
+            System.Diagnostics.Debug.WriteLine(loiChiTiet);
+
+            throw new InvalidOperationException(
+                "Lỗi lưu thông tin ảnh vào database:\n" + loiChiTiet,
+                ex);
+        }
+
 
         // Ghi Audit Log qua thủ tục sp_GhiNhatKy
         try

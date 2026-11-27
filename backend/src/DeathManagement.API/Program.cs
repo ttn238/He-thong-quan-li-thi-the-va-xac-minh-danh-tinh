@@ -8,10 +8,12 @@ namespace DeathManagement.API;
 
 static class Program
 {
-    // Đọc cấu hình từ appsettings.json (phải khai báo TRƯỚC Options vì khởi tạo theo thứ tự)
-    static readonly IConfigurationRoot Config = new ConfigurationBuilder()
+    // Đọc cấu hình từ appsettings.json và ghi đè bằng appsettings.local.json (nếu có trên máy cá nhân)
+    internal static readonly IConfigurationRoot Config = new ConfigurationBuilder()
         .SetBasePath(AppContext.BaseDirectory)
-        .AddJsonFile("appsettings.json")
+        .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+        .AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true)
+        .AddEnvironmentVariables()
         .Build();
 
     // ĐĂNG KÝ "policy" ở tầng dữ liệu: interceptor kiểm tra quyền cho MỌI lệnh ghi
@@ -23,9 +25,11 @@ static class Program
 
     // Mỗi lần cần truy cập CSDL thì tạo một DbContext mới
     public static ApplicationDbContext NewDb() => new(Options);
+    public static string AiBaseUrl => Config["AiService:BaseUrl"] ?? "http://localhost:8000";
+    public static int AiTimeoutSeconds => int.TryParse(Config["AiService:TimeoutSeconds"], out var s) && s > 0 ? s : 30;
 
     [STAThread]
-    static void Main()
+    static void Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
 
@@ -37,6 +41,12 @@ static class Program
             Audience = Config["Jwt:Audience"] ?? "DeathManagement.Client",
             ExpireMinutes = int.TryParse(Config["Jwt:ExpireMinutes"], out var m) && m > 0 ? m : 480
         });
+
+        if (args.Contains("--body-api"))
+        {
+            BodyApiHost.Run(args.Where(x => x != "--body-api").ToArray());
+            return;
+        }
 
         // 2. Ghi Audit Log mọi lần bị từ chối quyền
         AccessControl.Denied += (userId, resource, action, reason) =>

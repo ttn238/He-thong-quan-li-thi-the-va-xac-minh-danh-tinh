@@ -118,7 +118,7 @@ public static class AuthorizationPolicies
         Grant(RoleAdmin, ScopeAll, ResourceFile, V);
         Grant(RoleAdmin, ScopeAll, ResourceAiResult, V);
         Grant(RoleAdmin, ScopeAll, ResourceBody, V, D);
-        Grant(RoleAdmin, ScopeAll, ResourceStorage, V, C, U);
+        Grant(RoleAdmin, ScopeAll, ResourceStorage, V, C, U, D);
         Grant(RoleAdmin, ScopeAll, ResourceMatching, V, U);
         Grant(RoleAdmin, ScopeAll, ResourceVerification, V);
         Grant(RoleAdmin, ScopeAll, ResourceReport, V, EX);

@@ -48,3 +48,25 @@ class ProcessingTimeoutError(AppError):
 class ModelUnavailableError(AppError):
     status_code = 503
     code = "MODEL_UNAVAILABLE"
+
+
+class OcrFailedError(AppError):
+    status_code = 500
+    code = "OCR_FAILED"
+
+
+class InvalidAddressError(AppError):
+    status_code = 400
+    code = "INVALID_ADDRESS"
+
+
+class GeocodingUnavailableError(AppError):
+    """Nguon tra cuu dia diem loi mang, bi gioi han toc do hoac tra du lieu khong hop le."""
+
+    status_code = 503
+    code = "GEOCODING_UNAVAILABLE"
+
+
+class GeocodingDisabledError(AppError):
+    status_code = 503
+    code = "GEOCODING_DISABLED"

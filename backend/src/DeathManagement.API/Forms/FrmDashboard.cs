@@ -165,10 +165,32 @@ public class FrmDashboard : Form
         })
         { Visible = AccessControl.Can(ResourceIncident, ActionCreate) };
         mnuNghiepVu.DropDownItems.Add(mnuTinBao);
+        var mnuLapHoSoThiThe = new ToolStripMenuItem("Lập hồ sơ thi thể...", null, (s, e) =>
+        {
+            if (!PermissionUi.Check(this, ResourceBody, ActionCreate)) return;
+            using var f = new FrmLapHoSoThiThe();
+            f.ShowDialog(this);
+        })
+        { Visible = AccessControl.Can(ResourceBody, ActionCreate) };
+        mnuNghiepVu.DropDownItems.Add(mnuLapHoSoThiThe);
         mnuNghiepVu.DropDownItems.Add(new ToolStripMenuItem("Hồ sơ người mất tích...")
         { Visible = AccessControl.Can(ResourceMissingPerson, ActionView) });
         mnuNghiepVu.DropDownItems.Add(new ToolStripMenuItem("Đối chiếu & Xác minh danh tính...")
         { Visible = AccessControl.Can(ResourceMatching, ActionView) });
+        var mnuKetQuaAi = new ToolStripMenuItem("🤖 Phân tích AI & Hiển thị kết quả AI...", null, (s, e) =>
+        {
+            if (!PermissionUi.Check(this, ResourceAiResult, ActionView)) return;
+            using var f = new FrmKetQuaAI();
+            f.ShowDialog(this);
+        })
+        { Visible = AccessControl.Can(ResourceAiResult, ActionView) };
+        mnuNghiepVu.DropDownItems.Add(mnuKetQuaAi);
+        mnuNghiepVu.DropDownItems.Add(new ToolStripMenuItem("Danh sách hồ sơ thi thể", null, (_, _) =>
+        {
+            if (!PermissionUi.Check(this, ResourceBody, ActionView)) return;
+            using var form = new FrmQuanLyThiThe();
+            form.ShowDialog(this);
+        }) { Visible = AccessControl.Can(ResourceBody, ActionView) });
         mnuNghiepVu.DropDownItems.Add(new ToolStripSeparator());
         var mnuKhoAnh = new ToolStripMenuItem("🖼️ Kho hình ảnh & Tệp đính kèm...", null, (s, e) =>
         {
@@ -178,6 +200,15 @@ public class FrmDashboard : Form
         })
         { Visible = AccessControl.Can(ResourceFile, ActionView) };
         mnuNghiepVu.DropDownItems.Add(mnuKhoAnh);
+
+        var mnuViTriLuuTru = new ToolStripMenuItem("Vị trí lưu trữ & Ngăn lạnh...", null, (s, e) =>
+        {
+            if (!PermissionUi.Check(this, ResourceStorage, ActionView)) return;
+            using var f = new FrmQuanLyViTriLuuTru();
+            f.ShowDialog(this);
+        })
+        { Visible = AccessControl.Can(ResourceStorage, ActionView) };
+        mnuNghiepVu.DropDownItems.Add(mnuViTriLuuTru);
 
         var mnuTroGiup = new ToolStripMenuItem("ℹ TRỢ GIÚP");
         mnuTroGiup.DropDownItems.Add(new ToolStripMenuItem("Thông tin phần mềm DVI Vietnam"));
@@ -202,6 +233,8 @@ public class FrmDashboard : Form
         pnlCards.Controls.Add(CreateStatCard("ĐANG BỊ KHÓA", lblUserKhoa, "Khóa tạm / vô hiệu hóa", UITheme.Red, 2 * (cardWidth + gap)));
         pnlCards.Controls.Add(CreateStatCard("DANH MỤC VAI TRÒ", lblTongRole, "Cấu hình phân quyền", UITheme.Blue, 3 * (cardWidth + gap)));
         pnlCards.Visible = laAdmin;   // thống kê tài khoản chỉ dành cho người có quyền ACCOUNT:VIEW
+        }
+
         // Action Center Panel
         var pnlActionCenter = new Panel
         {
@@ -254,6 +287,26 @@ public class FrmDashboard : Form
             }));
         }
 
+        if (AccessControl.Can(ResourceAiResult, ActionView))
+        {
+            pnlButtons.Controls.Add(CreateQuickActionButton("Phân tích AI & Hiển thị kết quả AI", ColorTranslator.FromHtml("#0f2a4a"), () =>
+            {
+                if (!PermissionUi.Check(this, ResourceAiResult, ActionView)) return;
+                using var f = new FrmKetQuaAI();
+                f.ShowDialog(this);
+            }));
+        }
+
+        if (AccessControl.Can(ResourceStorage, ActionView))
+        {
+            pnlButtons.Controls.Add(CreateQuickActionButton("Quản lý vị trí lưu trữ & kho lạnh", ColorTranslator.FromHtml("#16a085"), () =>
+            {
+                if (!PermissionUi.Check(this, ResourceStorage, ActionView)) return;
+                using var f = new FrmQuanLyViTriLuuTru();
+                f.ShowDialog(this);
+            }));
+        }
+
         pnlButtons.Controls.Add(CreateQuickActionButton("Thay đổi mật khẩu cá nhân", UITheme.Blue, () =>
         {
             using var f = new FrmDoiMatKhau();   // tự phục vụ: mọi vai trò đều được đổi mật khẩu của chính mình
@@ -262,30 +315,35 @@ public class FrmDashboard : Form
 
         if (AccessControl.Can(ResourceBody, ActionCreate))
         {
-            pnlButtons.Controls.Add(CreateQuickActionButton("Tiếp nhận hồ sơ tử thi (Body)", ColorTranslator.FromHtml("#34495e"), () =>
+            pnlButtons.Controls.Add(CreateQuickActionButton("📁 Lập hồ sơ thi thể (Body)", ColorTranslator.FromHtml("#34495e"), () =>
             {
                 if (!PermissionUi.Check(this, ResourceBody, ActionCreate)) return;
-                MessageBox.Show("Chức năng Tiếp nhận tử thi đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                using var f = new FrmLapHoSoThiThe();
+                f.ShowDialog(this);
             }));
         }
 
-        pnlButtons.Controls.Add(CreateQuickActionButton(isCitizen ? "📝 Khai báo tin báo sự việc / mất tích" : " Tiếp nhận tin báo sự việc", ColorTranslator.FromHtml("#0984e3"), () =>
+        if (AccessControl.Can(ResourceBody, ActionView))
         {
-            using var f = new FrmTiepNhanTinBao();
-            f.ShowDialog(this);
-        }));
-
-        // Chức năng nghiệp vụ tử thi và AI chỉ hiển thị cho cán bộ / admin, không dành cho người dân
-        if (!isCitizen)
-        {
-            pnlButtons.Controls.Add(CreateQuickActionButton("📁 Tiếp nhận hồ sơ tử thi (Body)", ColorTranslator.FromHtml("#34495e"), () =>
+            pnlButtons.Controls.Add(CreateQuickActionButton("📋 Danh sách hồ sơ thi thể", ColorTranslator.FromHtml("#2c3e50"), () =>
             {
-                MessageBox.Show("Chức năng Tiếp nhận tử thi đang sẵn sàng kết nối.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                if (!PermissionUi.Check(this, ResourceBody, ActionView)) return;
+                using var f = new FrmQuanLyThiThe();
+                f.ShowDialog(this);
             }));
+        }
 
-            pnlButtons.Controls.Add(CreateQuickActionButton("🔍 Đối chiếu danh tính (AI Matching)", ColorTranslator.FromHtml("#27ae60"), () =>
+        if (AccessControl.Can(ResourceIncident, ActionCreate))
+        {
+            pnlButtons.Controls.Add(CreateQuickActionButton(isCitizen ? "📝 Khai báo tin báo sự việc / mất tích" : "📝 Tiếp nhận tin báo sự việc", ColorTranslator.FromHtml("#0984e3"), () =>
             {
-        if (AccessControl.Can(ResourceMatching, ActionView))
+                if (!PermissionUi.Check(this, ResourceIncident, ActionCreate)) return;
+                using var f = new FrmTiepNhanTinBao();
+                f.ShowDialog(this);
+            }));
+        }
+
+        if (!isCitizen && AccessControl.Can(ResourceMatching, ActionView))
         {
             pnlButtons.Controls.Add(CreateQuickActionButton("Đối chiếu danh tính (AI Matching)", ColorTranslator.FromHtml("#27ae60"), () =>
             {
@@ -383,14 +441,6 @@ public class FrmDashboard : Form
 
     private void LoadThongKe()
     {
-        var tk = Session.TaiKhoan;
-        var laAdmin = tk != null && (
-            tk.TenVaiTro.Contains("Quản trị", StringComparison.OrdinalIgnoreCase) ||
-            tk.TenVaiTro.Contains("ADMIN", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(tk.TenDangNhap, "admin", StringComparison.OrdinalIgnoreCase));
-
-        // Không cần nạp thống kê tài khoản nếu không phải Quản trị viên
-        if (!laAdmin) return;
         if (!AccessControl.Can(ResourceAccount, ActionView))
         {
             lblTongUser.Text = lblUserHoatDong.Text = lblUserKhoa.Text = lblTongRole.Text = "-";

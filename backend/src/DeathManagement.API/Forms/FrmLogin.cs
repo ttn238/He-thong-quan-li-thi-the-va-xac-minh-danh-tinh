@@ -138,9 +138,13 @@ public class FrmLogin : Form
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine(ex);    // xem chi tiết lỗi ở cửa sổ Output của Visual Studio
-            HienLoi("Không kết nối được cơ sở dữ liệu.");
-            
+            MessageBox.Show(
+                $"Không kết nối được cơ sở dữ liệu.\n\n" +
+                $"Chi tiết: {ex.Message}\n\n" +
+                $"Loại lỗi: {ex.GetType().FullName}",
+                "Lỗi kết nối SQL Server",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
         }
         finally
         {

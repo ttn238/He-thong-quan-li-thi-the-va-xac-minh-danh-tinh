@@ -23,3 +23,31 @@ class LicensePlateResult(BaseModel):
     confidence: float = 0.0
     is_valid_format: bool = False
     candidates: list[PlateCandidate] = []
+
+
+class ExtractedField(BaseModel):
+    """Mot truong thong tin trich xuat tu giay to. Truong khong tim thay se KHONG duoc tao
+    (None o `DocumentExtractionResult`), khong bao gio dien gia tri doan."""
+
+    value: Optional[str] = Field(None, description="Gia tri da chuan hoa")
+    raw_value: Optional[str] = Field(None, description="Van ban OCR tho (da lam sach khoang trang/NFC)")
+    confidence: float = Field(0.0, ge=0, le=1)
+    box: Optional[BoundingBox] = Field(None, description="Toa do tren anh goc; None neu engine khong tra toa do")
+
+
+class DocumentExtractionResult(BaseModel):
+    image: ImageInfo
+    document_type: str = Field(description="cccd | cmnd | driver_license | unknown")
+    is_valid_document: bool = Field(description="Nhan dien duoc loai giay to va doc duoc so giay to")
+    overall_confidence: float = Field(0.0, ge=0, le=1, description="Trung binh confidence cac truong tim thay")
+    id_number: Optional[ExtractedField] = None
+    full_name: Optional[ExtractedField] = None
+    date_of_birth: Optional[ExtractedField] = None
+    gender: Optional[ExtractedField] = None
+    nationality: Optional[ExtractedField] = None
+    hometown: Optional[ExtractedField] = None
+    residence: Optional[ExtractedField] = None
+    expiry_date: Optional[ExtractedField] = None
+    issue_date: Optional[ExtractedField] = None
+    missing_fields: list[str] = Field(default_factory=list, description="Ten cac truong khong nhan dien duoc")
+    raw_texts: list[str] = Field(default_factory=list, description="Toan bo van ban OCR da lam sach, theo thu tu doc")

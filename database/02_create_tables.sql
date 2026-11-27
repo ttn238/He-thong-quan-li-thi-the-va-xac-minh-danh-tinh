@@ -188,7 +188,7 @@ CREATE TABLE HoSoThiThe
     ThoiGianPhatHien DATETIME2 NOT NULL,
     DiaDiem NVARCHAR(255),
     TrangThai NVARCHAR(30) NOT NULL DEFAULT N'MoiTiepNhan',
-    GioiTinh NVARCHAR(10),
+    GioiTinh NVARCHAR(20),
     TuoiUocLuong SMALLINT,
     ChieuCao DECIMAL(5,2),                -- don vi: cm
     DacDiemCoThe NVARCHAR(MAX),
@@ -205,7 +205,11 @@ CREATE TABLE HoSoThiThe
         CHECK (TuoiUocLuong IS NULL OR TuoiUocLuong BETWEEN 0 AND 130),
 
     CONSTRAINT CK_HoSoThiThe_ChieuCao
-        CHECK (ChieuCao IS NULL OR ChieuCao > 0)
+        CHECK (ChieuCao IS NULL OR ChieuCao > 0),
+
+    CONSTRAINT CK_HoSoThiThe_TrangThai
+        CHECK (TrangThai IN (N'MoiTiepNhan', N'DangLuuGiu', N'DangXacMinh', N'TiepTucLuuGiu',
+                             N'DaXacDinh', N'DaBanGiao', N'DongHoSo'))
 );
 GO
  
