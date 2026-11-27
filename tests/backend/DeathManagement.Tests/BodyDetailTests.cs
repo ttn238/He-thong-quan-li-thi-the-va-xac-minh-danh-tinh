@@ -2,12 +2,14 @@ using System.Security.Claims;
 using DeathManagement.API.Controllers;
 using DeathManagement.API.Data;
 using DeathManagement.API.DTOs.Body;
+using DeathManagement.API.DTOs.Image;
 using DeathManagement.API.Entities;
 using DeathManagement.API.Forms;
 using DeathManagement.API.Repositories;
 using DeathManagement.API.Repositories.Interfaces;
 using DeathManagement.API.Security;
 using DeathManagement.API.Services;
+using DeathManagement.API.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -108,6 +110,19 @@ public class BodyDetailTests
         public Task CapNhatAsync(long maHoSoThiThe, UpdateBodyRequest request, long maTaiKhoan) => throw new NotSupportedException();
         public Task ChuyenTrangThaiAsync(long maHoSoThiThe, string trangThaiMoi, string? lyDo, long maTaiKhoan) => throw new NotSupportedException();
         public Task<List<BodyStatusHistoryDto>> LayLichSuTrangThaiAsync(long maHoSoThiThe) => throw new NotSupportedException();
+    }
+
+    /// <summary>BodyController cần IImageService cho nhóm endpoint ảnh; nhóm test chi tiết không dùng tới.</summary>
+    private sealed class NoopImageService : IImageService
+    {
+        public Task<List<ImageDto>> LayDanhSachHinhAnhAsync(ImageFilterRequest filter, bool coQuyenXemNhayCam)
+            => Task.FromResult(new List<ImageDto>());
+        public Task<ImageDto> TaiLenHinhAnhAsync(UploadImageRequest req, IProgress<int>? progress = null) => throw new NotSupportedException();
+        public Task<ImageDto> TaiLenHinhAnhTuStreamAsync(Stream nguon, string tenFileTaiLen, UploadImageRequest req, IProgress<int>? progress = null) => throw new NotSupportedException();
+        public Task<bool> XoaHinhAnhAsync(long maHinhAnh, long maTaiKhoan) => Task.FromResult(true);
+        public string LayDuongDanVatLy(string duongDanLuuTru) => duongDanLuuTru;
+        public Task<byte[]?> DocDuLieuHinhAnhAsync(long maHinhAnh, bool coQuyenXemNhayCam) => Task.FromResult<byte[]?>(null);
+        public Task<(byte[] DuLieu, string DinhDang)?> DocAnhCuaHoSoThiTheAsync(long maHoSoThiThe, long maHinhAnh) => Task.FromResult<(byte[], string)?>(null);
     }
 
     private static ClaimsPrincipal MakePrincipal(long userId, string roleCode)
@@ -245,7 +260,7 @@ public class BodyDetailTests
         try
         {
             var repo = new FakeBodyRepository { ReturnNull = true };
-            var controller = new BodyController(new BodyService(repo));
+            var controller = new BodyController(new BodyService(repo), new NoopImageService());
 
             var notFound = await controller.GetById(9999);
             Assert.IsType<NotFoundObjectResult>(notFound);

@@ -167,7 +167,62 @@ public class ImageService(ApplicationDbContext db) : IImageService
         )).ToList();
     }
 
-    public async Task<ImageDto> TaiLenHinhAnhAsync(UploadImageRequest req, IProgress<int>? progress = null)
+    public Task<ImageDto> TaiLenHinhAnhAsync(UploadImageRequest req, IProgress<int>? progress = null)
+    {
+        if (!File.Exists(req.FilePath))
+        {
+            throw new FileNotFoundException(
+                "Không tìm thấy tệp ảnh được chọn.");
+        }
+
+        return TaiLenTuFileAsync(req.FilePath, Path.GetFileName(req.FilePath), req, progress);
+    }
+
+    /// <summary>
+    /// Nạp ảnh trực tiếp từ luồng (dành cho HTTP multipart, không có đường dẫn tệp phía máy khách).
+    /// </summary>
+    public async Task<ImageDto> TaiLenHinhAnhTuStreamAsync(
+        Stream nguon, string tenFileTaiLen, UploadImageRequest req, IProgress<int>? progress = null)
+    {
+        ArgumentNullException.ThrowIfNull(nguon);
+        tenFileTaiLen = Path.GetFileName(tenFileTaiLen ?? string.Empty);
+
+        // Kiểm tra phần mở rộng trước vì nó quyết định tên tệp tạm; tên tệp luôn do hệ thống sinh
+        if (!FileHelper.IsValidImageExtension(tenFileTaiLen))
+            throw new InvalidOperationException("Định dạng ảnh không được hỗ trợ.");
+
+        var tempDir = Path.Combine(StorageBaseDir, "tmp");
+        Directory.CreateDirectory(tempDir);
+        var tempPath = Path.Combine(tempDir, $"{Guid.NewGuid():N}{Path.GetExtension(tenFileTaiLen).ToLowerInvariant()}");
+
+        try
+        {
+            await using (var temp = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, true))
+            {
+                var buffer = new byte[81920];
+                long daNhan = 0;
+                int read;
+                while ((read = await nguon.ReadAsync(buffer)) > 0)
+                {
+                    daNhan += read;
+                    // Dừng ngay khi vượt ngưỡng thay vì nhận đủ tệp rồi mới từ chối
+                    if (daNhan > FileHelper.MaxFileSizeInBytes)
+                        throw new InvalidOperationException(
+                            $"Ảnh phải lớn hơn 0 và không quá {FileHelper.MaxFileSizeInBytes / (1024 * 1024)} MB.");
+                    await temp.WriteAsync(buffer.AsMemory(0, read));
+                }
+            }
+
+            return await TaiLenTuFileAsync(tempPath, tenFileTaiLen, req, progress);
+        }
+        finally
+        {
+            try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { /* không che mất lỗi gốc */ }
+        }
+    }
+
+    private async Task<ImageDto> TaiLenTuFileAsync(
+        string duongDanNguon, string tenFileTaiLen, UploadImageRequest req, IProgress<int>? progress)
     {
         // [PHÂN QUYỀN] kiểm tra TRƯỚC khi sao chép tệp để không sinh tệp rác
         AccessControl.Require(AuthorizationPolicies.ResourceFile, AuthorizationPolicies.ActionCreate);
@@ -198,22 +253,17 @@ public class ImageService(ApplicationDbContext db) : IImageService
             && await db.Images.CountAsync(x => x.MaHoSoMatTich == req.MaHoSoMatTich && x.TrangThai == "HoatDong") >= ImageHelper.MaxAnhMoiHoSoMatTich)
             throw new InvalidOperationException($"Hồ sơ mất tích đã đủ {ImageHelper.MaxAnhMoiHoSoMatTich} ảnh.");
 
-        if (!File.Exists(req.FilePath))
-        {
-            throw new FileNotFoundException(
-                "Không tìm thấy tệp ảnh được chọn.");
-        }
-
-        var fi = new FileInfo(req.FilePath);
-        if (!FileHelper.IsValidImageExtension(fi.Name))
+        if (!FileHelper.IsValidImageExtension(tenFileTaiLen))
             throw new InvalidOperationException("Định dạng ảnh không được hỗ trợ.");
+
+        var fi = new FileInfo(duongDanNguon);
         if (!FileHelper.IsValidFileSize(fi.Length))
             throw new InvalidOperationException("Ảnh phải lớn hơn 0 và không quá 10 MB.");
-        if (!FileHelper.IsValidImageContent(req.FilePath))
+        if (!FileHelper.IsValidImageContent(duongDanNguon))
             throw new InvalidOperationException("Tệp không phải ảnh hợp lệ hoặc đã bị hỏng.");
 
         var ext = fi.Extension.ToLowerInvariant();
-        var mime = ImageHelper.GetMimeType(fi.Name);
+        var mime = ImageHelper.GetMimeType(tenFileTaiLen);
 
         // Quy tắc NFR1.2: Ảnh tử thi hoặc loại ThiThe_* bắt buộc gán cờ LaNhayCam = true
         var laNhayCam = req.LaNhayCam || req.MaHoSoThiThe.HasValue || req.LoaiHinhAnh.StartsWith("ThiThe_");
@@ -227,7 +277,7 @@ public class ImageService(ApplicationDbContext db) : IImageService
         var relativePath = $"/{subFolder}/{fileGuid}";
 
         // Async I/O copy file có báo cáo tiến trình (Chương 5 Đồ án)
-        await using (var sourceStream = new FileStream(req.FilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true))
+        await using (var sourceStream = new FileStream(duongDanNguon, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true))
         await using (var destStream = new FileStream(destFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
         {
             var buffer = new byte[81920];
@@ -279,7 +329,7 @@ public class ImageService(ApplicationDbContext db) : IImageService
         var entity = new Image
         {
             TenFile = fileGuid,
-            TenGoc = fi.Name,
+            TenGoc = tenFileTaiLen,
             DuongDan = relativePath,
             LoaiHinhAnh = req.LoaiHinhAnh,
             DinhDang = mime,
@@ -406,5 +456,19 @@ public class ImageService(ApplicationDbContext db) : IImageService
             return null;
 
         return await File.ReadAllBytesAsync(physicalPath);
+    }
+
+    public async Task<(byte[] DuLieu, string DinhDang)?> DocAnhCuaHoSoThiTheAsync(long maHoSoThiThe, long maHinhAnh)
+    {
+        // Khoá truy vấn theo đúng hồ sơ: ảnh của hồ sơ khác trả về như không tồn tại
+        var dinhDang = await db.Images.AsNoTracking()
+            .Where(x => x.MaHinhAnh == maHinhAnh && x.MaHoSoThiThe == maHoSoThiThe && x.TrangThai == "HoatDong")
+            .Select(x => x.DinhDang)
+            .FirstOrDefaultAsync();
+        if (dinhDang == null)
+            return null;
+
+        var duLieu = await DocDuLieuHinhAnhAsync(maHinhAnh, coQuyenXemNhayCam: false);
+        return duLieu == null ? null : (duLieu, dinhDang);
     }
 }

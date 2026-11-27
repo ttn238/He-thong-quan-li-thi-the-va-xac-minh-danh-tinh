@@ -2,6 +2,8 @@ using DeathManagement.API.Common;
 using DeathManagement.API.DTOs.Role;
 using DeathManagement.API.Repositories;
 using DeathManagement.API.Repositories.Interfaces;
+using DeathManagement.API.Security;
+using static DeathManagement.API.Security.AuthorizationPolicies;
 using DeathManagement.API.Services.Interfaces;
 
 namespace DeathManagement.API.Services;
@@ -27,6 +29,7 @@ public class RoleService : IRoleService
     /// </summary>
     public async Task<List<RoleDto>> GetRolesWithStatsAsync()
     {
+        AccessControl.Require(ResourcePermission, ActionView);
         return await _roleRepo.GetRolesWithStatsAsync();
     }
 
@@ -35,6 +38,7 @@ public class RoleService : IRoleService
     /// </summary>
     public async Task<RoleDto?> GetRoleDetailsAsync(int roleId)
     {
+        AccessControl.Require(ResourcePermission, ActionView);
         return await _roleRepo.GetRoleDetailsAsync(roleId);
     }
 
@@ -43,6 +47,7 @@ public class RoleService : IRoleService
     /// </summary>
     public async Task<List<ResourceGroupedPermissionsDto>> GetAllPermissionsGroupedAsync()
     {
+        AccessControl.Require(ResourcePermission, ActionView);
         var all = await _roleRepo.GetAllPermissionsAsync();
         return all
             .GroupBy(p => p.Resource)
@@ -60,6 +65,8 @@ public class RoleService : IRoleService
     /// </summary>
     public async Task<bool> AssignRoleAsync(long currentUserId, AssignRoleRequest request)
     {
+        AccessControl.Require(ResourcePermission, ActionUpdate);
+
         // Bước 1: Kiểm tra vai trò đích có tồn tại trong hệ thống hay không
         var roleExists = await _roleRepo.RoleExistsAsync(request.MaVaiTro);
         if (!roleExists)
@@ -101,6 +108,8 @@ public class RoleService : IRoleService
     /// </summary>
     public async Task<bool> UpdateRolePermissionsAsync(long currentUserId, int roleId, UpdateRolePermissionsRequest request)
     {
+        AccessControl.Require(ResourcePermission, ActionUpdate);
+
         var roleExists = await _roleRepo.RoleExistsAsync(roleId);
         if (!roleExists)
         {
